@@ -138,6 +138,7 @@ powershell -ExecutionPolicy Bypass -File .\start-yoooni.ps1
 | `.ps1` 报"字符串缺少终止符/意外标记" | 脚本存成了 UTF-8 无 BOM，PS 5.1 按 GBK 读乱 → 存成 **UTF-8 带 BOM** |
 | 访问 8080 打不开 | 本项目 resin.xml 端口配的是 **90**（日志 `http listening to *:90`）→ 访问 `http://localhost:90/...` |
 | 扫描报 `module-info.class unknown constant pool` | 现代 jar 的多版本 JAR，Resin4 扫描器看不懂，**仅告警不影响启动**，忽略 |
+| `resin_os ... UnsatisfiedLinkError: no resin_os in java.library.path` | IDEA Resin 配置默认把 `java.library.path` 指到 `\bin`，但 `resin_os.dll` 在 `win64\`。本地开发**不需要该原生库，可忽略**；要消除就在 VM options 加 `-Djava.library.path=<ResinHome>\win64` |
 | 启动报连接失败 / Bean 初始化错 | Redis 没起；或数据库没配（第 4 节） |
 | Spring 报 `config/spring/... cannot be resolved` | classes 里缺资源(xml/properties)；IDEA Build(Ctrl+F9) 会自动拷资源，或脚本已自动同步 |
 | 首次 Build 巨慢(十几分钟) | 一次性全量；关 Windows Defender 实时扫描 + 调大构建堆/并行编译（第 5 节）；之后用增量 Ctrl+F9 |

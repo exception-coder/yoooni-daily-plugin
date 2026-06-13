@@ -1,7 +1,7 @@
 {
   "name": "yoooni-daily-plugin",
   "description": "Yoooni 日常工作 Claude Code 插件：4 个 Skill（入职初始化 — SVN 拉取项目文档；共享网络访问 — 修复 SMB 访问 \\\\IT01；IDEA 导入 Yoooni — 搭建 Resin 开发环境；日常启动 — 检查中间件并启动项目）",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "author": {
     "name": "张凯",
     "email": "ping.yang@kpay-group.com"
