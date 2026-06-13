@@ -54,7 +54,7 @@ IDEA 默认会把 Web 根猜成 `web`，**但本项目的 Web 根是 `WebRoot`**
 
 ### 2.5 编码 + 编译参数 ⭐否则乱码/编译失败
 - `Settings → 编辑器 → 文件编码`：**项目编码设 GBK**（源码以 GBK 为主）。⚠️ 仓库**混合编码**（同事用 UTF-8 存过一批文件）：`src` 多为 GBK、`WebRoot` 多为 UTF-8，还有数百例外。**别转换文件**（丢数据+污染 git）。
-  最省事：跑本 skill 自带的 **`setup-idea-config.ps1`**（放项目根 → `powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1`），它**一次性**生成三样 IDEA 运行配置——`encodings.xml`(混合编码) + `compiler.xml`(构建堆/并行/字节码1.8) + `resin-web.xml`(JSP 1.8)，完事 `File → Reload All from Disk`。详见第 6 节。
+  最省事：跑本 skill 自带的 **`setup-idea-config.ps1`**（放项目根 → `powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1`），它**一次性**生成两样 IDEA 运行配置——`encodings.xml`(混合编码) + `compiler.xml`(构建堆/并行/字节码1.8)，完事 `File → Reload All from Disk`。详见第 6 节。
 - `Settings → 构建、执行、部署 → Java 编译器`："附加命令行参数"加 **`-XDignore.symbol.file`**（项目引用了 `com.sun.image.codec.jpeg`、`com.sun.xml.internal.ws` 等 JDK 内部 API，不加会报"程序包不存在"）
 
 ---
@@ -98,13 +98,8 @@ powershell -ExecutionPolicy Bypass -File .\start-yoooni.ps1
 2. 方式 A：点 ▶；方式 B/C：跑脚本
 3. 浏览器访问 **`http://localhost:90/login/login.jsp`**
 
-> 🈂️ **JSP 编译告警乱码（可选消除）**：首次访问某 JSP 时 Resin 用 javac 即时编译，会打印 `警告: [options] 源值 1.5 已过时...3 个警告`，中文在控制台显示成 `??`。无害。要消除：在 `WebRoot\WEB-INF\resin-web.xml` 配置 JSP 用 1.8 编译（本 skill 项目已带该文件）：
-> ```xml
-> <web-app xmlns="http://caucho.com/ns/resin">
->   <javac args="-source 1.8 -target 1.8" />
-> </web-app>
-> ```
-> 改完重启 Resin。
+> 🈂️ **JSP 编译告警乱码**：首次访问某 JSP 时 Resin 用 javac 即时编译，会打印 `警告: [options] 源值 1.5 已过时...3 个警告`，中文在控制台显示成 `??`。**纯告警、无害，忽略即可**。
+> ⚠️ **别用 `<javac>` 去治**：在 `resin-web.xml` 写 `<javac args="-source 1.8 -target 1.8"/>` 会因 Resin 语法限制（`<compiler> is expected`）**导致 web-app 部署失败**（实测踩过）。默认 JSP 编译器照常工作，告警留着就好。
 
 > 🗄️ **数据库（中间件）**：Spring + Druid + **Oracle**（驱动 `ojdbc14.jar` 已在 lib）。连接配置在 **`src\jdbc.properties`**，当前生效项连**远程共享 Oracle**（如 `@47.106.94.45:1521:orcl`）——**不用本机装/起 Oracle**，只要网络能连到（多半需公司网络/VPN）。本地唯一要起的中间件是 **Redis**（`start-yoooni.ps1` 已含启动 + Oracle 连通性预检）。
 
@@ -146,9 +141,10 @@ powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1
 |---|---|---|
 | `.idea\encodings.xml` | src=GBK / WebRoot=UTF-8 + 逐文件例外（自动按多数派判定） | 中文乱码 |
 | `.idea\compiler.xml` | 构建堆 3072 + 并行编译 + 字节码 1.8 | 编译慢/GC 抖动 |
-| `WebRoot\WEB-INF\resin-web.xml` | `<javac args="-source 1.8 -target 1.8" />` | JSP 编译告警乱码 |
 
-完事：IDEA `File → Reload All from Disk`；**compiler 堆大小要重启 IDEA、resin-web 要重启 Resin** 才生效。
+完事：IDEA `File → Reload All from Disk`；**compiler 堆大小要重启 IDEA** 才生效。
+
+> ❌ 不生成 `resin-web.xml`：曾想用 `<javac>` 治 JSP 的"1.5 已过时"告警，但那写法会让 web-app 部署失败（`<compiler> is expected`）。该告警无害，忽略即可。
 
 > ⚠️ 脚本只管"写文件"的配置。**SDK=1.8、模块输出=`WebRoot\WEB-INF\classes`、Web facet=`WebRoot`、部署描述符、Resin 运行配置**这些 IDEA 图形界面里点的，脚本不碰，仍按第 2~3 节手动设。
 
@@ -169,7 +165,7 @@ powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1
 | 访问 8080 打不开 | 本项目 resin.xml 端口配的是 **90**（日志 `http listening to *:90`）→ 访问 `http://localhost:90/...` |
 | 扫描报 `module-info.class unknown constant pool` | 现代 jar 的多版本 JAR，Resin4 扫描器看不懂，**仅告警不影响启动**，忽略 |
 | `resin_os ... UnsatisfiedLinkError: no resin_os in java.library.path` | IDEA Resin 配置默认把 `java.library.path` 指到 `\bin`，但 `resin_os.dll` 在 `win64\`。本地开发**不需要该原生库，可忽略**；要消除就在 VM options 加 `-Djava.library.path=<ResinHome>\win64` |
-| JSP 告警乱码 `??: [options] ?? -source 1.5 ...` | JSP 即时编译的 javac 中文告警（源值 1.5 已过时），无害；消除：`WEB-INF\resin-web.xml` 配 `<javac args="-source 1.8 -target 1.8" />`（第 4 节） |
+| JSP 告警乱码 `??: [options] ?? -source 1.5 ...` | JSP 即时编译的 javac 中文告警（源值 1.5 已过时），**无害忽略**。⚠️别用 `<javac>` 写 resin-web.xml 去治——会让 web-app 部署失败（`<compiler> is expected`） |
 | 启动报连接失败 / Bean 初始化错 | Redis 没起；或数据库没配（第 4 节） |
 | Spring 报 `config/spring/... cannot be resolved` | classes 里缺资源(xml/properties)；IDEA Build(Ctrl+F9) 会自动拷资源，或脚本已自动同步 |
 | 首次 Build 巨慢(十几分钟) | 一次性全量；关 Windows Defender 实时扫描 + 调大构建堆/并行编译（第 5 节）；之后用增量 Ctrl+F9 |

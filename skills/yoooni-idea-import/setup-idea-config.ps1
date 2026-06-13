@@ -1,11 +1,12 @@
 ﻿# 一键生成 / 调整 Yoooni 在 IDEA 下运行相关的配置文件（不改源码、不进 git，.idea 未被跟踪）。
-# 写三样：
-#   1) .idea\encodings.xml          —— 混合编码映射(src 多为 GBK、WebRoot 多为 UTF-8 + 少数例外)，治中文乱码
-#   2) .idea\compiler.xml           —— 构建堆 3072 + 并行编译 + 字节码目标 1.8，加速并避免 GC 抖动
-#   3) WebRoot\WEB-INF\resin-web.xml —— JSP 用 -source/-target 1.8 编译，消除"源值 1.5 已过时"告警乱码
+# 写两样：
+#   1) .idea\encodings.xml  —— 混合编码映射(src 多为 GBK、WebRoot 多为 UTF-8 + 少数例外)，治中文乱码
+#   2) .idea\compiler.xml   —— 构建堆 3072 + 并行编译 + 字节码目标 1.8，加速并避免 GC 抖动
 # 用法：放项目根 → powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1
-# 完事在 IDEA：File -> Reload All from Disk（compiler 堆大小需重启 IDEA、resin-web 需重启 Resin 生效）。
+# 完事在 IDEA：File -> Reload All from Disk（compiler 堆大小需重启 IDEA 生效）。
 # 注意：SDK=1.8 / 模块输出=WebRoot\WEB-INF\classes / Web facet=WebRoot 等需在 IDEA 图形界面设，见 IDEA-手动操作指引.md。
+# 不再生成 resin-web.xml：<javac> 在 resin-web.xml 里写法不当会让 web-app 部署失败
+# (resin-web.xml:N <compiler> is expected)；JSP "源值 1.5 已过时"只是无害告警，忽略即可。
 
 $ProjDir = $PSScriptRoot          # 脚本在项目根；否则填工程绝对路径
 $ErrorActionPreference = "Stop"
@@ -61,16 +62,8 @@ $compilerXml = @'
 Write-Xml (Join-Path $ProjDir ".idea\compiler.xml") $compilerXml
 Write-Host "[compiler] 构建堆 3072 + 并行编译 + 字节码 1.8" -ForegroundColor Cyan
 
-# ============ 3) WebRoot\WEB-INF\resin-web.xml（JSP 用 1.8 编译） ============
-$resinWeb = @'
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- 让 Resin 编译 JSP 时用 1.8，消除"源值 1.5 已过时"告警乱码。仅消除告警，不影响功能。 -->
-<web-app xmlns="http://caucho.com/ns/resin">
-  <javac args="-source 1.8 -target 1.8" />
-</web-app>
-'@
-Write-Xml (Join-Path $ProjDir "WebRoot\WEB-INF\resin-web.xml") $resinWeb
-Write-Host "[resin-web] JSP 编译 -source/-target 1.8" -ForegroundColor Cyan
+# 注：不生成 resin-web.xml。JSP "源值 1.5 已过时" 是无害告警，忽略即可；
+#     用 <javac> 去治反而会因语法限制(<compiler> is expected)导致 web-app 部署失败。
 
-Write-Host "`n完成。下一步：IDEA `File -> Reload All from Disk`；compiler 堆大小需重启 IDEA、resin-web 需重启 Resin 生效。" -ForegroundColor Green
+Write-Host "`n完成。下一步：IDEA `File -> Reload All from Disk`；compiler 堆大小需重启 IDEA 生效。" -ForegroundColor Green
 Write-Host "SDK=1.8 / 模块输出=WebRoot\WEB-INF\classes / Web facet=WebRoot 等图形界面设置见 IDEA-手动操作指引.md。" -ForegroundColor Yellow

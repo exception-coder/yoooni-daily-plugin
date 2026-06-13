@@ -135,14 +135,8 @@ powershell -ExecutionPolicy Bypass -File start-yoooni.ps1
 现代 jar（commons-lang3/codec 等多版本 JAR）里的 Java9 模块描述符，Resin4 老扫描器看不懂——**只是告警，不影响启动**，可忽略。
 
 ### 访问 JSP 时控制台刷 `??: [options] ?? -source 1.5 ...` 乱码告警
-Resin 即时编译 JSP 时 javac 打的中文告警（"源值 1.5 已过时…3 个警告"），控制台编码不符显示成 `??`。**无害**。
-根治：在 `WebRoot\WEB-INF\resin-web.xml` 配 JSP 用 1.8 编译（消除告警本身）：
-```xml
-<web-app xmlns="http://caucho.com/ns/resin">
-  <javac args="-source 1.8 -target 1.8" />
-</web-app>
-```
-改完重启 Resin。
+Resin 即时编译 JSP 时 javac 打的中文告警（"源值 1.5 已过时…3 个警告"），控制台编码不符显示成 `??`。**纯告警、无害，直接忽略即可**。
+> ⚠️ **不要用 `<javac>` 去治**：在 `WebRoot\WEB-INF\resin-web.xml` 写 `<javac args="-source 1.8 -target 1.8"/>` 会因 Resin 语法限制（`<compiler> is expected`）**导致 web-app 部署失败**（实测踩过）。Resin 默认 JSP 编译器照常工作，这个告警留着就好。
 
 ### 首次 Build 巨慢（十几分钟）
 7000+ 文件全量 + 拷资源 + 工件 + 字节码增强，混合编码还分组编译，首次很慢（一次性）。提速：
@@ -181,7 +175,7 @@ java -Dresin.home=<ResinHome> -Djava.library.path=<ResinHome>\win64 -Ddruid.logT
 本仓库是**混合编码**——绝大多数 .java 是 **GBK**，但混进了约 **65 个 UTF-8** 文件（多在 `com/maxtile/application/erp/finance`、`openapi`、`common/utils` 等）。单一项目编码必然让一部分乱码。
 > ⚠️ **不要去转换文件编码！** 实测把 UTF-8 文件批量转 GBK 会丢数据、且污染 git（几十上百个文件变更）。
 >
-> **正确做法（无损、不改源码、不进 git）**：用本 skill 自带的 **`setup-idea-config.ps1`** 一条命令生成 `.idea/encodings.xml`（连同 compiler.xml、resin-web.xml 一起，见下「一键配置」）：
+> **正确做法（无损、不改源码、不进 git）**：用本 skill 自带的 **`setup-idea-config.ps1`** 一条命令生成 `.idea/encodings.xml`（连同 compiler.xml 一起）：
 > ```powershell
 > powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1   # 放项目根运行
 > ```
