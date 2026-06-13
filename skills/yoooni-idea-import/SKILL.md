@@ -181,9 +181,9 @@ java -Dresin.home=<ResinHome> -Djava.library.path=<ResinHome>\win64 -Ddruid.logT
 本仓库是**混合编码**——绝大多数 .java 是 **GBK**，但混进了约 **65 个 UTF-8** 文件（多在 `com/maxtile/application/erp/finance`、`openapi`、`common/utils` 等）。单一项目编码必然让一部分乱码。
 > ⚠️ **不要去转换文件编码！** 实测把 UTF-8 文件批量转 GBK 会丢数据、且污染 git（几十上百个文件变更）。
 >
-> **正确做法（无损、不改源码、不进 git）**：用本 skill 自带的 **`setup-encodings.ps1`** 一条命令生成 `.idea/encodings.xml`（`.idea` 未被 git 跟踪）：
+> **正确做法（无损、不改源码、不进 git）**：用本 skill 自带的 **`setup-idea-config.ps1`** 一条命令生成 `.idea/encodings.xml`（连同 compiler.xml、resin-web.xml 一起，见下「一键配置」）：
 > ```powershell
-> powershell -ExecutionPolicy Bypass -File setup-encodings.ps1   # 放项目根运行
+> powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1   # 放项目根运行
 > ```
 > 它扫描 `src` / `WebRoot`，每棵树按**多数派**定目录默认编码（实测 `src`→GBK、`WebRoot`→UTF-8），**少数派逐文件覆盖**，生成约 700+ 条规则。完事在 IDEA `File → Reload All from Disk`。
 >
@@ -198,7 +198,7 @@ java -Dresin.home=<ResinHome> -Djava.library.path=<ResinHome>\win64 -Ddruid.logT
 > ```
 > 检测某文件编码：严格 UTF-8 解码能过且含非 ASCII 即 UTF-8，否则 GBK。
 >
-> ⚠️ **背景**：这个混合编码是同事用 UTF-8 存了一批文件（仓库主体是 GBK）造成的。**根治应是团队统一编码**（统一到 UTF-8 最稳，无损），但那是全仓库变更、需团队决策；个人本地用 `setup-encodings.ps1` 即可正常开发。
+> ⚠️ **背景**：这个混合编码是同事用 UTF-8 存了一批文件（仓库主体是 GBK）造成的。**根治应是团队统一编码**（统一到 UTF-8 最稳，无损），但那是全仓库变更、需团队决策；个人本地用 `setup-idea-config.ps1` 即可正常开发。
 >
 > **编译**：用 **IDEA Build**（按每文件编码分组编译，能处理混合）；命令行单一 `javac -encoding` 处理不了混合编码，只适合临时验证依赖。
 

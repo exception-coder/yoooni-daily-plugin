@@ -54,7 +54,7 @@ IDEA 默认会把 Web 根猜成 `web`，**但本项目的 Web 根是 `WebRoot`**
 
 ### 2.5 编码 + 编译参数 ⭐否则乱码/编译失败
 - `Settings → 编辑器 → 文件编码`：**项目编码设 GBK**（源码以 GBK 为主）。⚠️ 仓库**混合编码**（同事用 UTF-8 存过一批文件）：`src` 多为 GBK、`WebRoot` 多为 UTF-8，还有数百例外。**别转换文件**（丢数据+污染 git）。
-  最省事：跑本 skill 自带的 **`setup-encodings.ps1`**（放项目根 → `powershell -ExecutionPolicy Bypass -File setup-encodings.ps1`），它自动生成 `.idea/encodings.xml`（目录级默认 + 逐文件例外），完事 `File → Reload All from Disk`。
+  最省事：跑本 skill 自带的 **`setup-idea-config.ps1`**（放项目根 → `powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1`），它**一次性**生成三样 IDEA 运行配置——`encodings.xml`(混合编码) + `compiler.xml`(构建堆/并行/字节码1.8) + `resin-web.xml`(JSP 1.8)，完事 `File → Reload All from Disk`。详见第 6 节。
 - `Settings → 构建、执行、部署 → Java 编译器`："附加命令行参数"加 **`-XDignore.symbol.file`**（项目引用了 `com.sun.image.codec.jpeg`、`com.sun.xml.internal.ws` 等 JDK 内部 API，不加会报"程序包不存在"）
 
 ---
@@ -132,7 +132,29 @@ powershell -ExecutionPolicy Bypass -File .\start-yoooni.ps1
 
 ---
 
-## 6. 常见坑速查
+## 6. 一键生成全部运行配置（setup-idea-config.ps1）
+
+前面 2.5 的编码、5 的构建堆、4 的 JSP 1.8——这些**写文件就能搞定**的 IDEA 运行配置，本 skill 自带脚本一条命令全做了。把 `setup-idea-config.ps1` 放到项目根，运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup-idea-config.ps1
+```
+
+它会生成/覆盖三个文件（**不改源码、`.idea` 不进 git**）：
+
+| 文件 | 内容 | 治什么 |
+|---|---|---|
+| `.idea\encodings.xml` | src=GBK / WebRoot=UTF-8 + 逐文件例外（自动按多数派判定） | 中文乱码 |
+| `.idea\compiler.xml` | 构建堆 3072 + 并行编译 + 字节码 1.8 | 编译慢/GC 抖动 |
+| `WebRoot\WEB-INF\resin-web.xml` | `<javac args="-source 1.8 -target 1.8" />` | JSP 编译告警乱码 |
+
+完事：IDEA `File → Reload All from Disk`；**compiler 堆大小要重启 IDEA、resin-web 要重启 Resin** 才生效。
+
+> ⚠️ 脚本只管"写文件"的配置。**SDK=1.8、模块输出=`WebRoot\WEB-INF\classes`、Web facet=`WebRoot`、部署描述符、Resin 运行配置**这些 IDEA 图形界面里点的，脚本不碰，仍按第 2~3 节手动设。
+
+---
+
+## 7. 常见坑速查
 
 | 现象 | 原因 / 解决 |
 |---|---|

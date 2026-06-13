@@ -117,7 +117,7 @@ yoooni-daily-plugin/
 │   │   ├── SKILL.md
 │   │   ├── IDEA-手动操作指引.md   # IDEA 图形界面手把手（项目结构/Facet/工件/运行配置）
 │   │   ├── start-yoooni.ps1     # 一键启动脚本（Redis + Resin console）
-│   │   └── setup-encodings.ps1  # 生成 .idea/encodings.xml 解决混合编码乱码
+│   │   └── setup-idea-config.ps1 # 一键生成 IDEA 运行配置（encodings/compiler/resin-web）
 │   └── yoooni-start/            # 日常启动 skill（检查中间件并启动）
 │       └── SKILL.md
 ├── .gitignore
