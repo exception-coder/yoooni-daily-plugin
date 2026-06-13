@@ -21,6 +21,13 @@ $v2 = (Get-Content .claude-plugin\marketplace.json | ConvertFrom-Json).plugins[0
 if ($v1 -ne $v2) { Write-Error "version mismatch: plugin.json=$v1 marketplace.json=$v2" }
 ```
 
+> ⚠️ **JSON 必须是无 BOM 的 UTF-8**。PowerShell 5.1 的 `Set-Content -Encoding UTF8` / `Out-File -Encoding UTF8` 会写入 **BOM**，导致 `/plugin marketplace add` 报 `Invalid JSON ... Unrecognized token`。改 json 用无 BOM 方式：
+> ```powershell
+> [System.IO.File]::WriteAllText($f, $text, (New-Object System.Text.UTF8Encoding($false)))
+> ```
+> 自检 BOM：`([System.IO.File]::ReadAllBytes($f)[0..2] -join ',') -eq '239,187,191'` 应为 `False`。
+> （`.ps1` 脚本则相反：PS 5.1 需要 **带 BOM** 的 UTF-8 才能正确读中文。）
+
 ## Adding a new skill
 
 1. Create `skills/<name>/SKILL.md` with frontmatter:
