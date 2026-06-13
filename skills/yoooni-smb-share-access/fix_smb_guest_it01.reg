@@ -1,0 +1,22 @@
+Windows Registry Editor Version 5.00
+
+; SMB client: allow fallback to insecure Guest logons.
+; The Policies path is important on newer Windows builds and when policy precedence applies.
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation]
+"AllowInsecureGuestAuth"=dword:00000001
+"EnableInsecureGuestLogons"=dword:00000001
+"RequireSecuritySignature"=dword:00000000
+"EnableSecuritySignature"=dword:00000000
+
+; SMB client runtime parameters.
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters]
+"AllowInsecureGuestAuth"=dword:00000001
+"EnableInsecureGuestLogons"=dword:00000001
+"RequireSecuritySignature"=dword:00000000
+"EnableSecuritySignature"=dword:00000000
+
+; SMB server parameters are included only for parity with the original file.
+; They affect other computers accessing this PC, not this PC accessing IT01.
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters]
+"RequireSecuritySignature"=dword:00000000
+"EnableSecuritySignature"=dword:00000000
