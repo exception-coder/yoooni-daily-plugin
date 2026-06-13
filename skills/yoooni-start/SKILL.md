@@ -1,6 +1,6 @@
 ---
 name: yoooni-start
-description: 日常启动 Yoooni 项目（已搭好环境后每天用）。当用户说"启动 Yoooni / 跑起来 / 起项目 / 本地起服务 / 启动开发环境 / start yoooni / 项目怎么启动"时触发。先检查本地必备中间件 Redis（默认 127.0.0.1:6379），没在跑就按默认路径启动；默认路径找不到 redis-server 时暂停、提示用户输入 Redis 地址/安装路径再启动；并预检远程 Oracle 连通性，最后启动 Resin 并给出访问地址。与首次环境搭建的 yoooni-idea-import 区分——本 skill 只管"启动"，不重复搭建。
+description: 日常启动 Yoooni 项目（已搭好环境后每天用）。当用户说"启动 Yoooni / 跑起来 / 起项目 / 本地起服务 / 启动开发环境 / start yoooni / 项目怎么启动"时触发。先确定项目根目录（读已保存配置 / 默认 D:\yoooni\yoooniCodeSpace\yoooni / 找不到就问用户并记住，绝不在磁盘乱搜 start-yoooni.ps1），再检查本地必备中间件 Redis（默认 127.0.0.1:6379，没在跑就按默认路径启动；找不到 redis-server 时问用户），预检远程 Oracle 连通性，最后用绝对路径跑项目根的 start-yoooni.ps1 启动 Resin（无需 cd 到项目目录）并给出访问地址。与首次环境搭建的 yoooni-idea-import 区分——本 skill 只管"启动"，不重复搭建。
 ---
 
 # Yoooni 日常启动
@@ -22,6 +22,24 @@ description: 日常启动 Yoooni 项目（已搭好环境后每天用）。当�
 | 访问入口 | `http://localhost:90/login/login.jsp` | resin.xml 配的是 **90** 端口(非默认8080)，与应用 `rooturl=localhost:90` 吻合 | — |
 
 ## 启动流程
+
+### Step 0: 确定项目根目录（别靠当前目录、别乱搜）
+
+⚠️ **不要在文件系统里搜 `start-yoooni.ps1`**（会找错目录、卡很久）。也**无需让用户 cd 到项目目录**——后面全用绝对路径。按下面取项目根：
+
+```powershell
+# 读已保存的项目根；没有则用默认
+$cfg = "$env:USERPROFILE\.config\yoooni\project.json"
+$proj = if (Test-Path $cfg) { (Get-Content $cfg -Raw | ConvertFrom-Json).project_root } else { "D:\yoooni\yoooniCodeSpace\yoooni" }
+"项目根: $proj   start-yoooni.ps1 存在? " + (Test-Path (Join-Path $proj "start-yoooni.ps1"))
+```
+
+- **存在** → 用这个 `$proj`，进入 Step 1。
+- **不存在** → **暂停问用户**："你的 Yoooni 项目克隆在哪？（例如 `D:\yoooni\yoooniCodeSpace\yoooni`）"。拿到后存起来，下次自动用：
+  ```powershell
+  New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\yoooni" | Out-Null
+  @{ project_root = "用户给的路径" } | ConvertTo-Json | Set-Content "$env:USERPROFILE\.config\yoooni\project.json" -Encoding UTF8
+  ```
 
 ### Step 1: 检查 Redis（必备）—— 没有就问用户
 
@@ -68,10 +86,13 @@ $dbOk = (Test-NetConnection -ComputerName $dbHost -Port $dbPort -WarningAction S
 
 二选一：
 
-- **脚本**（最快）：项目根的 `start-yoooni.ps1` 已封装"Redis 预检+启动 / Oracle 预检 / Resin console 启动"：
+- **脚本（最快、推荐）**：**用绝对路径**跑项目根的 `start-yoooni.ps1`（已封装"Redis 预检+启动 / Oracle 预检 / 资源同步 / Resin console 启动"）。下面自包含、不依赖当前目录：
   ```powershell
-  powershell -ExecutionPolicy Bypass -File start-yoooni.ps1
+  $cfg = "$env:USERPROFILE\.config\yoooni\project.json"
+  $proj = if (Test-Path $cfg) { (Get-Content $cfg -Raw | ConvertFrom-Json).project_root } else { "D:\yoooni\yoooniCodeSpace\yoooni" }
+  powershell -ExecutionPolicy Bypass -File "$proj\start-yoooni.ps1"
   ```
+  > console 前台启动会一直占着窗口输出日志，看到 `Resin started ... http listening to *:90` 即成功。
 - **IDEA**：点已配好的 Resin 运行配置 ▶（见 [yoooni-idea-import](../yoooni-idea-import/SKILL.md) 的手动指引）。
 
 ### Step 4: 验证
