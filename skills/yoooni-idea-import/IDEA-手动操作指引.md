@@ -102,7 +102,29 @@ powershell -ExecutionPolicy Bypass -File .\start-yoooni.ps1
 
 ---
 
-## 5. 常见坑速查
+## 5. 构建加速（首次全量编译很慢，实测有效）
+
+首次 `Rebuild Project` 慢（7000+ 文件 + 拷资源 + 工件 + 字节码增强，混合编码还要分组编译，可能十几分钟）。**这是一次性的**，之后用 `Build Project (Ctrl+F9)` 是**增量**，几秒钟。再加几招提速：
+
+1. **关 / 排除 Windows Defender 实时扫描**（⭐ 提升最明显）：Defender 会逐个扫描新写出的 `.class`，极拖慢。把工程目录、JDK、Resin 目录加入"排除项"（设置 → 隐私和安全性 → 病毒和威胁防护 → 管理设置 → 排除项），或临时关实时防护。**实测快非常多。**
+2. **调大构建堆 + 并行编译**：本 skill 已在项目 `.idea/compiler.xml` 写好：
+   ```xml
+   <component name="CompilerConfiguration">
+     <option name="BUILD_PROCESS_HEAP_SIZE" value="3072" />   <!-- 默认 700 偏小 -->
+     <bytecodeTargetLevel target="1.8" />
+   </component>
+   <component name="CompilerWorkspaceConfiguration">
+     <option name="PARALLEL_COMPILATION" value="true" />
+   </component>
+   ```
+   等价 UI：`Settings → 构建/执行/部署 → 编译器`，"共享构建进程堆大小"=3072、勾"独立模块并行编译"。改完**重启 IDEA**（堆大小下次构建生效）。
+3. **平时别用 Rebuild**：改完代码 `Ctrl+F9` 增量构建即可；**只跑应用**时 Resin 运行配置/`start-yoooni.ps1` 会增量构建工件，不必全量 Rebuild。
+
+> 注：混合编码（src=GBK、WebRoot=UTF-8）会让编译器按编码分组、比单一编码慢一点——根治是全仓库统一编码（需团队决策）。
+
+---
+
+## 6. 常见坑速查
 
 | 现象 | 原因 / 解决 |
 |---|---|
@@ -118,4 +140,5 @@ powershell -ExecutionPolicy Bypass -File .\start-yoooni.ps1
 | 扫描报 `module-info.class unknown constant pool` | 现代 jar 的多版本 JAR，Resin4 扫描器看不懂，**仅告警不影响启动**，忽略 |
 | 启动报连接失败 / Bean 初始化错 | Redis 没起；或数据库没配（第 4 节） |
 | Spring 报 `config/spring/... cannot be resolved` | classes 里缺资源(xml/properties)；IDEA Build(Ctrl+F9) 会自动拷资源，或脚本已自动同步 |
+| 首次 Build 巨慢(十几分钟) | 一次性全量；关 Windows Defender 实时扫描 + 调大构建堆/并行编译（第 5 节）；之后用增量 Ctrl+F9 |
 | 界面步骤拿不准 | 对照共享 `IDEA2022导入Yoooni.pdf` 截图 |
