@@ -134,6 +134,16 @@ powershell -ExecutionPolicy Bypass -File start-yoooni.ps1
 ### 扫描报 `META-INF/versions/9/module-info.class unknown constant pool type`
 现代 jar（commons-lang3/codec 等多版本 JAR）里的 Java9 模块描述符，Resin4 老扫描器看不懂——**只是告警，不影响启动**，可忽略。
 
+### 访问 JSP 时控制台刷 `??: [options] ?? -source 1.5 ...` 乱码告警
+Resin 即时编译 JSP 时 javac 打的中文告警（"源值 1.5 已过时…3 个警告"），控制台编码不符显示成 `??`。**无害**。
+根治：在 `WebRoot\WEB-INF\resin-web.xml` 配 JSP 用 1.8 编译（消除告警本身）：
+```xml
+<web-app xmlns="http://caucho.com/ns/resin">
+  <javac args="-source 1.8 -target 1.8" />
+</web-app>
+```
+改完重启 Resin。
+
 ### 首次 Build 巨慢（十几分钟）
 7000+ 文件全量 + 拷资源 + 工件 + 字节码增强，混合编码还分组编译，首次很慢（一次性）。提速：
 **关 Windows Defender 实时扫描 / 把工程目录加排除项**（实测最明显）；调大构建堆 + 并行编译（`.idea/compiler.xml` 设 `BUILD_PROCESS_HEAP_SIZE=3072` + `PARALLEL_COMPILATION=true`）。之后改代码用 **增量 Build(Ctrl+F9)** 即可，几秒钟。详见 [IDEA-手动操作指引.md](IDEA-手动操作指引.md) 第 5 节。

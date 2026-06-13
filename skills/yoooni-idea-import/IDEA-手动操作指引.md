@@ -98,6 +98,14 @@ powershell -ExecutionPolicy Bypass -File .\start-yoooni.ps1
 2. 方式 A：点 ▶；方式 B/C：跑脚本
 3. 浏览器访问 **`http://localhost:90/login/login.jsp`**
 
+> 🈂️ **JSP 编译告警乱码（可选消除）**：首次访问某 JSP 时 Resin 用 javac 即时编译，会打印 `警告: [options] 源值 1.5 已过时...3 个警告`，中文在控制台显示成 `??`。无害。要消除：在 `WebRoot\WEB-INF\resin-web.xml` 配置 JSP 用 1.8 编译（本 skill 项目已带该文件）：
+> ```xml
+> <web-app xmlns="http://caucho.com/ns/resin">
+>   <javac args="-source 1.8 -target 1.8" />
+> </web-app>
+> ```
+> 改完重启 Resin。
+
 > 🗄️ **数据库（中间件）**：Spring + Druid + **Oracle**（驱动 `ojdbc14.jar` 已在 lib）。连接配置在 **`src\jdbc.properties`**，当前生效项连**远程共享 Oracle**（如 `@47.106.94.45:1521:orcl`）——**不用本机装/起 Oracle**，只要网络能连到（多半需公司网络/VPN）。本地唯一要起的中间件是 **Redis**（`start-yoooni.ps1` 已含启动 + Oracle 连通性预检）。
 
 ---
@@ -139,6 +147,7 @@ powershell -ExecutionPolicy Bypass -File .\start-yoooni.ps1
 | 访问 8080 打不开 | 本项目 resin.xml 端口配的是 **90**（日志 `http listening to *:90`）→ 访问 `http://localhost:90/...` |
 | 扫描报 `module-info.class unknown constant pool` | 现代 jar 的多版本 JAR，Resin4 扫描器看不懂，**仅告警不影响启动**，忽略 |
 | `resin_os ... UnsatisfiedLinkError: no resin_os in java.library.path` | IDEA Resin 配置默认把 `java.library.path` 指到 `\bin`，但 `resin_os.dll` 在 `win64\`。本地开发**不需要该原生库，可忽略**；要消除就在 VM options 加 `-Djava.library.path=<ResinHome>\win64` |
+| JSP 告警乱码 `??: [options] ?? -source 1.5 ...` | JSP 即时编译的 javac 中文告警（源值 1.5 已过时），无害；消除：`WEB-INF\resin-web.xml` 配 `<javac args="-source 1.8 -target 1.8" />`（第 4 节） |
 | 启动报连接失败 / Bean 初始化错 | Redis 没起；或数据库没配（第 4 节） |
 | Spring 报 `config/spring/... cannot be resolved` | classes 里缺资源(xml/properties)；IDEA Build(Ctrl+F9) 会自动拷资源，或脚本已自动同步 |
 | 首次 Build 巨慢(十几分钟) | 一次性全量；关 Windows Defender 实时扫描 + 调大构建堆/并行编译（第 5 节）；之后用增量 Ctrl+F9 |
