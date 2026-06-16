@@ -1,6 +1,6 @@
 # yoooni-daily-plugin
 
-Yoooni 团队日常工作 Claude Code 插件。包含 **5 个 Skill**，后续按需扩展。
+Yoooni 团队日常工作 Claude Code 插件。包含 **6 个 Skill**，后续按需扩展。
 
 ## 快速开始（60 秒）
 
@@ -36,6 +36,7 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 | [yoooni-idea-import](skills/yoooni-idea-import/SKILL.md) | IDEA 导入 Yoooni：搭建 Resin 开发环境 | "导入 Yoooni 项目"、"IDEA 打开 Yoooni"、"配置 Resin"、"项目跑不起来" |
 | [yoooni-start](skills/yoooni-start/SKILL.md) | 日常启动：检查中间件(Redis/Oracle)并启动 | "启动 Yoooni"、"跑起来"、"起项目"、"本地起服务" |
 | [yoooni-install-team-tools](skills/yoooni-install-team-tools/SKILL.md) | 一键安装公司团队工具（Gitee 源）：2 插件 + 1 MCP + 1 知识库 | "安装公司插件"、"拉一下团队工具"、"一键安装团队规范"、"装 team-standards/MCP" |
+| [yoooni-prod-log-query](skills/yoooni-prod-log-query/SKILL.md) | 查生产后台接口注册日志（apiRegistrylog）排查线上 | "查生产日志"、"查接口日志"、"排查线上 XX 接口"、"apiRegistrylog" |
 
 ## Skills 详细说明
 
@@ -125,6 +126,24 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 
 详见 [skills/yoooni-install-team-tools/SKILL.md](skills/yoooni-install-team-tools/SKILL.md)
 
+### yoooni-prod-log-query — 生产日志查询（排查线上）
+
+**触发短语**：
+- "查生产日志" / "查接口日志" / "看生产后台接口调用记录"
+- "排查线上 XX 接口" / "线上这个方法查一下" / "apiRegistrylog"
+- "查 url=insertOrUpdatePoconfig 的生产请求"
+
+**核心功能**：
+- 通过生产后台 `https://wyoooni.net/sys/apiRegistrylog_list.action` 查接口注册日志
+- 表单化参数：日期范围、接口名、url 方法（主过滤条件）、内容、启用状态
+- cookie 存用户主目录配置文件 `%USERPROFILE%\.config\yoooni\prod-backend.json`，**不硬编码、不入仓库**
+- **cookie 过期自动检测**（返回疑似登录页）→ 退出码 3 并打印替换指引
+- 成功后原始 HTML 存 `%TEMP%\yoooni-prod-log\`，可直接 Read 解析日志表格
+
+> ⚠️ 配置文件含登录凭据，仅存本机用户目录，切勿提交到任何仓库。
+
+详见 [skills/yoooni-prod-log-query/SKILL.md](skills/yoooni-prod-log-query/SKILL.md)
+
 ## 目录结构
 
 ```
@@ -146,9 +165,12 @@ yoooni-daily-plugin/
 │   │   └── setup-idea-config.ps1 # 一键生成 IDEA 运行配置（encodings/compiler/resin-web）
 │   ├── yoooni-start/            # 日常启动 skill（检查中间件并启动）
 │   │   └── SKILL.md
-│   └── yoooni-install-team-tools/ # 一键安装公司团队工具 skill（Gitee 源）
+│   ├── yoooni-install-team-tools/ # 一键安装公司团队工具 skill（Gitee 源）
+│   │   ├── SKILL.md
+│   │   └── install-team-tools.ps1 # 一键脚本：clone/pull 四仓库 + 构建注册 MCP
+│   └── yoooni-prod-log-query/    # 生产日志查询 skill（接口注册日志排查）
 │       ├── SKILL.md
-│       └── install-team-tools.ps1 # 一键脚本：clone/pull 四仓库 + 构建注册 MCP
+│       └── query-prod-log.ps1   # 查询脚本：表单参数 + cookie 配置 + 过期检测
 ├── .gitignore
 ├── CLAUDE.md                # 维护指引
 └── README.md
