@@ -136,11 +136,16 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 **核心功能**：
 - 通过生产后台 `https://wyoooni.net/sys/apiRegistrylog_list.action` 查接口注册日志
 - 表单化参数：日期范围、接口名、url 方法（主过滤条件）、内容、启用状态
-- cookie 存用户主目录配置文件 `%USERPROFILE%\.config\yoooni\prod-backend.json`，**不硬编码、不入仓库**
-- **cookie 过期自动检测**（返回疑似登录页）→ 退出码 3 并打印替换指引
-- 成功后原始 HTML 存 `%TEMP%\yoooni-prod-log\`，可直接 Read 解析日志表格
+- **账号密码自动登录**（Spring Security `/j_spring_security_check`）拿会话，**不再手工复制 cookie、不会过期**
+- 账号密码存用户主目录配置文件 `%USERPROFILE%\.config\yoooni\prod-backend.json`，**不硬编码、不入仓库**
+- **支持翻页**：`-AllPages` 自动翻全部分页合并（后台每页仅 20 条，统计/找特定记录时必加）
+- 成功后 HTML 存 `%TEMP%\yoooni-prod-log\`，可直接 Read 解析日志表格
+  - `%TEMP%` 在 Windows 上通常解析为 `C:\Users\<用户名>\AppData\Local\Temp`，即完整路径形如 `C:\Users\<用户名>\AppData\Local\Temp\yoooni-prod-log\`
+  - 单页结果：`apilog_<时间戳>.html`；`-AllPages` 翻页合并结果：`apilog_all_<时间戳>.html`
+  - 快捷打开：`explorer "$env:TEMP\yoooni-prod-log"`
+  - 属系统临时文件，可能被清理；需长期留存请另存到别处
 
-> ⚠️ 配置文件含登录凭据，仅存本机用户目录，切勿提交到任何仓库。
+> ⚠️ 配置文件含登录账号密码，仅存本机用户目录，切勿提交到任何仓库。
 
 详见 [skills/yoooni-prod-log-query/SKILL.md](skills/yoooni-prod-log-query/SKILL.md)
 
@@ -170,7 +175,7 @@ yoooni-daily-plugin/
 │   │   └── install-team-tools.ps1 # 一键脚本：clone/pull 四仓库 + 构建注册 MCP
 │   └── yoooni-prod-log-query/    # 生产日志查询 skill（接口注册日志排查）
 │       ├── SKILL.md
-│       └── query-prod-log.ps1   # 查询脚本：表单参数 + cookie 配置 + 过期检测
+│       └── query-prod-log.ps1   # 查询脚本：账号密码自动登录 + 表单参数 + 翻页合并
 ├── .gitignore
 ├── CLAUDE.md                # 维护指引
 └── README.md
