@@ -1,6 +1,6 @@
 # yoooni-daily-plugin
 
-Yoooni 团队日常工作 Claude Code 插件。包含 **4 个 Skill**，后续按需扩展。
+Yoooni 团队日常工作 Claude Code 插件。包含 **5 个 Skill**，后续按需扩展。
 
 ## 快速开始（60 秒）
 
@@ -35,6 +35,7 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 | [yoooni-smb-share-access](skills/yoooni-smb-share-access/SKILL.md) | 共享网络访问：修复 SMB，访问 \\IT01 | "连不上共享"、"访问 \\IT01"、"安全策略阻止来宾访问"、"修复 SMB" |
 | [yoooni-idea-import](skills/yoooni-idea-import/SKILL.md) | IDEA 导入 Yoooni：搭建 Resin 开发环境 | "导入 Yoooni 项目"、"IDEA 打开 Yoooni"、"配置 Resin"、"项目跑不起来" |
 | [yoooni-start](skills/yoooni-start/SKILL.md) | 日常启动：检查中间件(Redis/Oracle)并启动 | "启动 Yoooni"、"跑起来"、"起项目"、"本地起服务" |
+| [yoooni-install-team-tools](skills/yoooni-install-team-tools/SKILL.md) | 一键安装公司团队工具（Gitee 源）：2 插件 + 1 MCP + 1 知识库 | "安装公司插件"、"拉一下团队工具"、"一键安装团队规范"、"装 team-standards/MCP" |
 
 ## Skills 详细说明
 
@@ -99,6 +100,31 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 
 详见 [skills/yoooni-start/SKILL.md](skills/yoooni-start/SKILL.md)
 
+### yoooni-install-team-tools — 一键安装公司团队工具
+
+**触发短语**：
+- "安装公司插件" / "拉一下团队工具" / "一键安装团队规范"
+- "装 team-standards / project-coding-profiles / project-domain-knowledge / cross-project-topology"
+- "新机器配置公司开发规范" / "拉一下公司的 plugin 和 mcp"
+
+**核心功能**（公司当前用 **Gitee** 管理源码，安装地址一律用 Gitee）：
+- 一键脚本 `install-team-tools.ps1`：克隆/更新四个仓库（幂等，重复运行安全）
+- **2 个插件**（marketplace + install）：team-standards（团队编码规范）、project-coding-profiles（项目编码画像）
+- **2 个 MCP 实例，复用同一引擎**：project-domain-knowledge 的 `dist/server.js` 是通用 md+frontmatter 知识引擎，靠 `DOMAIN_KB_DIR` 指向不同知识根目录，注册成两个实例——
+  - `domain-knowledge` → 业务公共认知（project-domain-knowledge）
+  - `cross-topology` → 跨项目拓扑（cross-project-topology，借同一 server.js，无需自己 build）
+
+| 仓库 | 类型 | Gitee 地址 |
+|---|---|---|
+| team-standards | 插件 | `https://gitee.com/wyoooni/team-standards.git` |
+| project-coding-profiles | 插件 | `https://gitee.com/wyoooni/project-coding-profiles.git` |
+| project-domain-knowledge | MCP 引擎 + 业务认知 | `https://gitee.com/wyoooni/project-domain-knowledge.git` |
+| cross-project-topology | MCP（复用引擎）跨项目拓扑 | `https://gitee.com/wyoooni/cross-project-topology.git` |
+
+> 插件用 `/plugin` slash 命令安装（脚本无法代敲，需在 Claude Code 会话执行）；两个 MCP 实例与克隆部分由脚本自动完成。cross-topology 需 cross-project-topology 仓库建立 `knowledge/` 知识根目录（frontmatter 含 `id` 的 .md）后才有内容可服务。
+
+详见 [skills/yoooni-install-team-tools/SKILL.md](skills/yoooni-install-team-tools/SKILL.md)
+
 ## 目录结构
 
 ```
@@ -118,8 +144,11 @@ yoooni-daily-plugin/
 │   │   ├── IDEA-手动操作指引.md   # IDEA 图形界面手把手（项目结构/Facet/工件/运行配置）
 │   │   ├── start-yoooni.ps1     # 一键启动脚本（Redis + Resin console）
 │   │   └── setup-idea-config.ps1 # 一键生成 IDEA 运行配置（encodings/compiler/resin-web）
-│   └── yoooni-start/            # 日常启动 skill（检查中间件并启动）
-│       └── SKILL.md
+│   ├── yoooni-start/            # 日常启动 skill（检查中间件并启动）
+│   │   └── SKILL.md
+│   └── yoooni-install-team-tools/ # 一键安装公司团队工具 skill（Gitee 源）
+│       ├── SKILL.md
+│       └── install-team-tools.ps1 # 一键脚本：clone/pull 四仓库 + 构建注册 MCP
 ├── .gitignore
 ├── CLAUDE.md                # 维护指引
 └── README.md

@@ -8,8 +8,8 @@
   "plugins": [
     {
       "name": "yoooni-daily-plugin",
-      "description": "Yoooni 日常工作 Claude Code 插件：4 个 Skill（入职初始化 — SVN 拉取项目文档；共享网络访问 — 修复 SMB 访问 \\\\IT01；IDEA 导入 Yoooni — 搭建 Resin 开发环境；日常启动 — 检查中间件并启动项目）",
-      "version": "0.5.3",
+      "description": "Yoooni 日常工作 Claude Code 插件：5 个 Skill（入职初始化 — SVN 拉取项目文档；共享网络访问 — 修复 SMB 访问 \\\\IT01；IDEA 导入 Yoooni — 搭建 Resin 开发环境；日常启动 — 检查中间件并启动项目；一键安装团队工具 — Gitee 拉取并安装公司插件+MCP）",
+      "version": "0.6.0",
       "source": "./",
       "author": {
         "name": "张凯",
