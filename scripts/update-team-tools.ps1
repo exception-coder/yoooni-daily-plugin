@@ -44,12 +44,14 @@ Log "=== update start (ws=$WorkspaceDir, scope=$McpScope) ==="
 $mcpDir  = Join-Path $WorkspaceDir 'project-domain-knowledge'
 $topoDir = Join-Path $WorkspaceDir 'cross-project-topology'
 $pdkChanged = $false
+$anyChanged = $false
 
 foreach ($d in @($mcpDir, $topoDir)) {
   if (Test-Path (Join-Path $d '.git')) {
     $before = (git -C $d rev-parse HEAD 2>$null)
     git -C $d pull --ff-only 2>&1 | ForEach-Object { Log ("  git " + $_) }
     $after  = (git -C $d rev-parse HEAD 2>$null)
+    if ($before -ne $after) { $anyChanged = $true }
     if (($d -eq $mcpDir) -and ($before -ne $after)) { $pdkChanged = $true }
   } else { Log ("  skip (not cloned): " + $d) }
 }
@@ -61,7 +63,8 @@ if ($pdkChanged -and (Has npm)) {
 }
 
 $entry = Join-Path $mcpDir 'dist\server.js'
-if ((Has claude) -and (Test-Path $entry)) {
+# 仅当仓库内容有更新时才重注册(触发 MCP 下次会话重启、加载新知识/引擎)；无变化不动，省churn
+if ($anyChanged -and (Has claude) -and (Test-Path $entry)) {
   $domainKb = Join-Path $mcpDir 'knowledge'
   $topoKb   = Join-Path $topoDir 'knowledge'
   claude mcp remove domain-knowledge -s $McpScope 2>$null | Out-Null
