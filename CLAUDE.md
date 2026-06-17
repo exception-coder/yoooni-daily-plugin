@@ -8,6 +8,8 @@ This is the **source repo of a Claude Code plugin** (`yoooni-daily-plugin`). It 
 
 The plugin ships **Skills** under `skills/*/SKILL.md` — natural-language-triggered playbooks (Claude routes by the `description:` frontmatter, no slash command needed).
 
+It also ships a **SessionStart hook** (`hooks/hooks.json` + `hooks/session-autoupdate.js`) + **PowerShell scripts** (`scripts/`) that auto-maintain the company suite: 每日后台 `git pull` + 重建公司 MCP 仓（project-domain-knowledge / cross-project-topology），并把插件新版提示带进上下文；`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（schtasks、每 4 小时）。详见 `skills/yoooni-update-team-tools`。开关 `YOOONI_AUTOUPDATE=off|now`。`.ps1` 须带 UTF-8 BOM（见下）。
+
 ## Plugin manifest layout
 
 - [.claude-plugin/plugin.json](.claude-plugin/plugin.json) — installable plugin manifest.

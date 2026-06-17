@@ -1,6 +1,6 @@
 # yoooni-daily-plugin
 
-Yoooni 团队日常工作 Claude Code 插件。包含 **6 个 Skill**，后续按需扩展。
+Yoooni 团队日常工作 Claude Code 插件。包含 **8 个 Skill** + **SessionStart 自动更新 hook**（每日后台刷新公司 MCP 仓），后续按需扩展。
 
 ## 快速开始（60 秒）
 
@@ -36,7 +36,9 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 | [yoooni-idea-import](skills/yoooni-idea-import/SKILL.md) | IDEA 导入 Yoooni：搭建 Resin 开发环境 | "导入 Yoooni 项目"、"IDEA 打开 Yoooni"、"配置 Resin"、"项目跑不起来" |
 | [yoooni-start](skills/yoooni-start/SKILL.md) | 日常启动：检查中间件(Redis/Oracle)并启动 | "启动 Yoooni"、"跑起来"、"起项目"、"本地起服务" |
 | [yoooni-install-team-tools](skills/yoooni-install-team-tools/SKILL.md) | 一键安装公司团队工具（Gitee 源）：2 插件 + 1 MCP + 1 知识库 | "安装公司插件"、"拉一下团队工具"、"一键安装团队规范"、"装 team-standards/MCP" |
+| [yoooni-update-team-tools](skills/yoooni-update-team-tools/SKILL.md) | 更新/同步公司套件 + 自动更新（MCP 自动、插件一键） | "更新公司套件"、"刷新插件和 MCP"、"开启自动更新"、"装个定时自动更新" |
 | [yoooni-prod-log-query](skills/yoooni-prod-log-query/SKILL.md) | 查生产后台接口注册日志（apiRegistrylog）排查线上 | "查生产日志"、"查接口日志"、"排查线上 XX 接口"、"apiRegistrylog" |
+| [yoooni-taskspace](skills/yoooni-taskspace/SKILL.md) | 跨目录任务空间：选择多个项目并用链接聚合到一个工作区 | "创建任务空间"、"合并几个项目"、"一键选择创建软链接"、"taskspace" |
 
 ## Skills 详细说明
 
@@ -126,6 +128,20 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 
 详见 [skills/yoooni-install-team-tools/SKILL.md](skills/yoooni-install-team-tools/SKILL.md)
 
+### yoooni-update-team-tools — 更新公司套件 + 自动维护
+
+**触发短语**：
+- "更新公司套件" / "更新团队工具" / "刷新插件和 MCP" / "同步最新规范"
+- "开启自动更新" / "装个定时自动更新" / "关掉自动更新" / "团队工具有没有新版"
+
+**核心功能**（装一个插件 → AI 自动维护全套；诚实分层）：
+- **MCP 层全自动**：`SessionStart` hook（`hooks/session-autoupdate.js`）每开 Claude Code、每天最多一次在**后台**（不阻塞会话）`git pull` 两个 MCP 仓（project-domain-knowledge 引擎 / cross-project-topology 知识）→ 引擎有变化才重建 → 幂等重注册。仓库目录自动定位（能从 `claude mcp get` 解析真实路径，解决默认 C 盘找不到 D 盘仓库的问题）。
+- **插件层半自动**：插件装/更新走 `/plugin` slash 命令、脚本代不了；检测到新版会把提示带进会话上下文，本 skill 一键打印 `/plugin marketplace update` + `install` 命令让你点一下。
+- **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、每 4 小时），Claude Code 没开也保持 MCP 最新。
+- 开关：环境变量 `YOOONI_AUTOUPDATE=off` 关闭、`=now` 立即刷一次。日志在 `%USERPROFILE%\.kai-toolbox\team-tools-update.log`。
+
+详见 [skills/yoooni-update-team-tools/SKILL.md](skills/yoooni-update-team-tools/SKILL.md)
+
 ### yoooni-prod-log-query — 生产日志查询（排查线上）
 
 **触发短语**：
@@ -148,6 +164,21 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 > ⚠️ 配置文件含登录账号密码，仅存本机用户目录，切勿提交到任何仓库。
 
 详见 [skills/yoooni-prod-log-query/SKILL.md](skills/yoooni-prod-log-query/SKILL.md)
+
+### yoooni-taskspace — 跨目录任务空间
+
+**触发短语**：
+- "创建任务空间" / "合并几个项目到一个工作区"
+- "几个大目录下的项目归到一个新任务空间"
+- "一键选择创建软链接" / "用 junction 聚合项目" / "taskspace"
+
+**核心功能**：
+- 用 Node 脚本 `taskspace.mjs` 创建声明式任务空间，成员写入 `.taskspace.json`
+- Windows 创建 junction（无需管理员权限），macOS/Linux 创建目录 symlink
+- 支持 `create / list / add / remove / teardown`
+- 拆除时只删除链接和清单，不删除源项目；目录非空时保留工作区目录
+
+详见 [skills/yoooni-taskspace/SKILL.md](skills/yoooni-taskspace/SKILL.md)
 
 ## 目录结构
 
@@ -172,10 +203,21 @@ yoooni-daily-plugin/
 │   │   └── SKILL.md
 │   ├── yoooni-install-team-tools/ # 一键安装公司团队工具 skill（Gitee 源）
 │   │   ├── SKILL.md
-│   │   └── install-team-tools.ps1 # 一键脚本：clone/pull 四仓库 + 构建注册 MCP
-│   └── yoooni-prod-log-query/    # 生产日志查询 skill（接口注册日志排查）
+│   │   └── install-team-tools.ps1 # 一键脚本：clone/pull 仓库 + 构建注册 MCP
+│   ├── yoooni-update-team-tools/  # 更新公司套件 + 自动更新 skill
+│   │   └── SKILL.md
+│   ├── yoooni-prod-log-query/    # 生产日志查询 skill（接口注册日志排查）
+│   │   ├── SKILL.md
+│   │   └── query-prod-log.ps1   # 查询脚本：账号密码自动登录 + 表单参数 + 翻页合并
+│   └── yoooni-taskspace/         # 跨目录任务空间 skill（junction/symlink 聚合项目）
 │       ├── SKILL.md
-│       └── query-prod-log.ps1   # 查询脚本：账号密码自动登录 + 表单参数 + 翻页合并
+│       └── taskspace.mjs        # 创建/查看/追加/移除/拆除任务空间
+├── hooks/
+│   ├── hooks.json               # SessionStart 自动更新 hook 声明
+│   └── session-autoupdate.js    # 每日后台刷新 MCP 仓 + 浮现插件新版提示
+├── scripts/
+│   ├── update-team-tools.ps1    # 同步脚本：pull 2 个 MCP 仓 + 必要时重建 + 幂等重注册
+│   └── register-autoupdate-task.ps1 # 注册 Windows 计划任务（schtasks，每 4 小时）
 ├── .gitignore
 ├── CLAUDE.md                # 维护指引
 └── README.md
