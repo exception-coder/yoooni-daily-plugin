@@ -39,15 +39,18 @@ powershell -ExecutionPolicy Bypass -File "<plugin>\scripts\update-team-tools.ps1
 
 ## B. 开启"会话外也定时刷新"（Windows 计划任务）
 
-登录时 + 每 4 小时自动跑同步脚本（即使没开 Claude Code），用户级任务、无需管理员：
+每 4 小时自动刷新全套（即使没开 Claude Code），用户级任务、无需管理员：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "<plugin>\scripts\register-autoupdate-task.ps1"
-# 仓库在 D 盘等非默认位置时指定： -WorkspaceDir D:\Users\zhang\myWork
 ```
 
 - 查看：`Get-ScheduledTask -TaskName YoooniTeamToolsAutoUpdate`
 - 卸载：`Unregister-ScheduledTask -TaskName YoooniTeamToolsAutoUpdate -Confirm:$false`
+
+> **稳定启动器（防自更新断链）**：计划任务**不直接**指向版本化的 `update-team-tools.ps1`，而是指向固定路径的启动器 `%USERPROFILE%\.kai-toolbox\run-update.ps1`；启动器运行时再定位缓存里**最新版本**的脚本来跑。
+> 原因：`claude plugin` 缓存目录带版本号，本插件**自更新**后旧版本目录会被回收——若任务写死旧路径就会断掉。
+> **自愈**：`update-team-tools.ps1` 每次跑完都会校准计划任务（`register-autoupdate-task.ps1 -OnlyIfExists`，仅当任务已存在）；旧版本注册的"直指 update 脚本"的任务，会在下次刷新时被自动迁移到启动器。从没注册过计划任务的机器不受影响、也不会被擅自创建。
 
 ## C. 自动更新开关（SessionStart hook，默认已开）
 

@@ -9,7 +9,7 @@
     {
       "name": "yoooni-daily-plugin",
       "description": "Yoooni 日常工作 Claude Code 插件：8 个 Skill（入职初始化 — SVN 拉取项目文档；共享网络访问 — 修复 SMB 访问 \\\\IT01；IDEA 导入 Yoooni — 搭建 Resin 开发环境；日常启动 — 检查中间件并启动项目；一键安装团队工具 — Gitee 拉取并安装公司插件+MCP；更新公司套件 — 全自动同步团队插件(claude plugin CLI)与 MCP；生产日志查询 — 查接口注册日志排查线上；跨目录任务空间 — 用链接聚合多个项目）+ SessionStart 自动更新 hook（每日后台 git pull + 重建公司 MCP 仓 + claude plugin update 自动更新插件）",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "source": "./",
       "author": {
         "name": "张凯",

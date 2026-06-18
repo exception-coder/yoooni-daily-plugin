@@ -98,4 +98,13 @@ if ($pluginUpdated.Count -gt 0) {
 } else {
   [IO.File]::WriteAllText($notice, "", $utf8)
 }
+# --- 自愈：若计划任务已存在，确保它指向稳定启动器(防插件自更新后版本化路径失效) ---
+# 仅校准已存在的任务，绝不擅自创建。本步在计划任务/SessionStart 两条触发路径下都会跑到。
+$reg = Join-Path $PSScriptRoot 'register-autoupdate-task.ps1'
+if (Test-Path $reg) {
+  # register 用 Write-Host 输出，PS 5.1 下 2>&1 捕获不到，这里只记一条固定日志，副作用照常发生
+  try { & $reg -OnlyIfExists | Out-Null; Log "  task: 自愈校准计划任务(指向稳定启动器，仅当任务已存在)" }
+  catch { Log ("  task self-heal skipped: " + $_.Exception.Message) }
+}
+
 Log ("=== update done (pdkChanged={0}, pluginsUpdated={1}) ===" -f $pdkChanged, $pluginUpdated.Count)

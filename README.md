@@ -137,7 +137,7 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 **核心功能**（装一个插件 → AI 全自动维护全套）：
 - **MCP 层全自动**：`SessionStart` hook（`hooks/session-autoupdate.js`）每开 Claude Code、每天最多一次在**后台**（不阻塞会话）`git pull` 两个 MCP 仓（project-domain-knowledge 引擎 / cross-project-topology 知识）→ 引擎有变化才重建 → 幂等重注册。仓库目录自动定位（能从 `claude mcp get` 解析真实路径，解决默认 C 盘找不到 D 盘仓库的问题）。
 - **插件层全自动**：同一脚本走 `claude plugin marketplace update` 刷源 → `claude plugin update <plugin>@<marketplace>` 逐个更新（team-standards / project-coding-profiles / yoooni-daily-plugin，幂等，已最新则空跑）。**更新后重启会话生效**，notice 会提示。（`claude plugin` 现为完整 CLI，"插件只能走 slash"的旧限制已废弃；插件名须带 `@marketplace` 全限定。）
-- **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、每 4 小时），Claude Code 没开也保持 MCP + 插件最新。
+- **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、每 4 小时），Claude Code 没开也保持 MCP + 插件最新。任务指向**固定路径的稳定启动器** `%USERPROFILE%\.kai-toolbox\run-update.ps1`（运行时再定位最新版脚本），避免本插件自更新后版本化缓存路径失效导致任务断链；`update-team-tools.ps1` 每次跑完会**自愈校准**任务（仅当任务已存在）。
 - 开关：环境变量 `YOOONI_AUTOUPDATE=off` 关闭、`=now` 立即刷一次。日志在 `%USERPROFILE%\.kai-toolbox\team-tools-update.log`。
 
 详见 [skills/yoooni-update-team-tools/SKILL.md](skills/yoooni-update-team-tools/SKILL.md)
@@ -216,8 +216,9 @@ yoooni-daily-plugin/
 │   ├── hooks.json               # SessionStart 自动更新 hook 声明
 │   └── session-autoupdate.js    # 每日后台刷新 MCP 仓 + 浮现插件新版提示
 ├── scripts/
-│   ├── update-team-tools.ps1    # 同步脚本：pull 2 个 MCP 仓 + 必要时重建/重注册 + claude plugin update 自动更新插件
-│   └── register-autoupdate-task.ps1 # 注册 Windows 计划任务（schtasks，每 4 小时）
+│   ├── update-team-tools.ps1    # 同步脚本：pull 2 个 MCP 仓 + 必要时重建/重注册 + claude plugin update 自动更新插件 + 自愈计划任务
+│   ├── run-update.ps1           # 稳定启动器：计划任务固定指向它，运行时定位最新版 update 脚本（防版本化路径失效）
+│   └── register-autoupdate-task.ps1 # 注册 Windows 计划任务（schtasks，每 4 小时，指向稳定启动器）
 ├── .gitignore
 ├── CLAUDE.md                # 维护指引
 └── README.md
