@@ -1,160 +1,222 @@
 ﻿<#
 .SYNOPSIS
-  一键拉取/更新公司团队工具仓库（全部走 Gitee），并完成可脚本化的安装：
-  - git clone / git pull 四个仓库
-  - project-domain-knowledge：npm install + build + 注册为 Claude Code MCP
-  - 输出两个插件的 /plugin 安装命令（slash 命令需用户在 Claude Code 里执行）
+  公司团队工具「一键首次安装」（全部走 Gitee 源）。
+  本脚本只负责【首次安装缺失的部分】：已安装的一律跳过，不重装、不更新——
+  需要更新请用『更新公司套件』skill(yoooni-update-team-tools) 或 scripts\update-team-tools.ps1。
+    - 仓库：缺失才 git clone（已存在则跳过，不 pull）
+    - MCP ：未注册才 build + claude mcp add（已注册则跳过）
+    - 插件：未安装才 claude plugin marketplace add + claude plugin install（已安装则跳过）
+            （claude plugin 现为完整 CLI，插件可全自动安装，无需手敲 slash）
+  注：claude mcp add 在 PowerShell 里必须用引号包住 '--'（裸 -- 会被 PS 吞掉，导致
+      变参 -e 吞掉 node+路径，报 "missing required argument 'commandOrUrl'"）。
 
 .PARAMETER WorkspaceDir
-  仓库克隆/更新的根目录。默认 $env:USERPROFILE\myWork。
-  已存在的仓库会执行 git pull 更新，不会重复克隆。
+  仓库克隆根目录。不传则自动定位：已克隆过的目录(任意盘) > 配置 > 默认 $env:USERPROFILE\myWork。
 
-.PARAMETER McpScope
-  project-domain-knowledge MCP 的注册范围：user(默认，全局可用) / local / project。
+.PARAMETER Scope
+  MCP 与插件的安装范围：user(默认，全局可用) / local / project。
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\install-team-tools.ps1
-  powershell -ExecutionPolicy Bypass -File .\install-team-tools.ps1 -WorkspaceDir D:\Users\zhang\myWork -McpScope user
+  powershell -ExecutionPolicy Bypass -File .\install-team-tools.ps1 -WorkspaceDir D:\Users\zhang\myWork -Scope user
 #>
 param(
-    [string]$WorkspaceDir = "$env:USERPROFILE\myWork",
+    [string]$WorkspaceDir,
     [ValidateSet('user', 'local', 'project')]
-    [string]$McpScope = 'user'
+    [string]$Scope = 'user'
 )
 
-$ErrorActionPreference = 'Stop'
+# 用 Continue：原生命令(claude mcp get/list 等)写 stderr 时，Stop 会把它当终止错误中断脚本。
+# git 缺失已在前置检查里显式 exit 1；其余失败按步骤各自处理。
+$ErrorActionPreference = 'Continue'
+$utf8 = New-Object System.Text.UTF8Encoding($false)   # 无 BOM
+$cfg  = Join-Path $env:USERPROFILE '.kai-toolbox\workspace.path'
+
+function Test-Cmd($name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
+function HasPdk($w) { return ($w -and (Test-Path (Join-Path $w 'project-domain-knowledge\.git'))) }
 
 # Gitee 是公司当前源码管理（GitHub 仅部分仓库镜像，安装一律用 Gitee）
 $Repos = @(
-    @{ Name = 'team-standards';          Url = 'https://gitee.com/wyoooni/team-standards.git';          Type = 'plugin' }
-    @{ Name = 'project-coding-profiles'; Url = 'https://gitee.com/wyoooni/project-coding-profiles.git'; Type = 'plugin' }
-    @{ Name = 'project-domain-knowledge';Url = 'https://gitee.com/wyoooni/project-domain-knowledge.git';Type = 'mcp(engine)' }
-    @{ Name = 'cross-project-topology';  Url = 'https://gitee.com/wyoooni/cross-project-topology.git';  Type = 'mcp(shared-engine)' }
+    @{ Name = 'team-standards';           Url = 'https://gitee.com/wyoooni/team-standards.git';           Type = 'plugin' }
+    @{ Name = 'project-coding-profiles';  Url = 'https://gitee.com/wyoooni/project-coding-profiles.git';  Type = 'plugin' }
+    @{ Name = 'project-domain-knowledge'; Url = 'https://gitee.com/wyoooni/project-domain-knowledge.git'; Type = 'mcp(engine)' }
+    @{ Name = 'cross-project-topology';   Url = 'https://gitee.com/wyoooni/cross-project-topology.git';   Type = 'mcp(shared-engine)' }
+)
+# 两个 Claude Code 插件：marketplace 名与插件名一致 -> 安装引用 name@name
+$Plugins = @(
+    @{ Name = 'team-standards';          Url = 'https://gitee.com/wyoooni/team-standards.git' }
+    @{ Name = 'project-coding-profiles'; Url = 'https://gitee.com/wyoooni/project-coding-profiles.git' }
 )
 
-function Test-Cmd($name) {
-    return [bool](Get-Command $name -ErrorAction SilentlyContinue)
-}
-
-Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host " 公司团队工具一键拉取/安装（Gitee 源）" -ForegroundColor Cyan
-Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "工作区目录: $WorkspaceDir"
-Write-Host "MCP 注册范围: $McpScope"
-Write-Host ""
-
 # --- 前置检查 ---
-if (-not (Test-Cmd git)) {
-    Write-Error "未检测到 git，请先安装 Git 并加入 PATH。"
-    exit 1
-}
+if (-not (Test-Cmd git)) { Write-Error "未检测到 git，请先安装 Git 并加入 PATH。"; exit 1 }
 $hasNode = Test-Cmd node
 $hasNpm  = Test-Cmd npm
 $hasClaude = Test-Cmd claude
-if (-not $hasNode -or -not $hasNpm) {
-    Write-Warning "未检测到 node/npm（>=18）。project-domain-knowledge(MCP) 的构建会被跳过，其余仓库照常拉取。"
+
+# --- 自动定位 WorkspaceDir：优先复用"已克隆过的目录"(任意盘)，避免在默认 C 盘重复克隆一份 ---
+$cands = @()
+if ($WorkspaceDir) { $cands += $WorkspaceDir }
+if ($env:YOOONI_WORKSPACE_DIR) { $cands += $env:YOOONI_WORKSPACE_DIR }
+if (Test-Path $cfg) { $cands += (((Get-Content $cfg -Raw) -replace "^\xEF\xBB\xBF", "") -replace "﻿", "").Trim() }
+if ($hasClaude) {
+    $info = @((claude mcp get domain-knowledge 2>$null); (claude mcp list 2>$null)) -join "`n"
+    $m = [regex]::Match($info, '([A-Za-z]:[\/].*?)[\/]project-domain-knowledge[\/]dist[\/]server\.js')
+    if ($m.Success) { $cands += $m.Groups[1].Value }
 }
-if (-not $hasClaude) {
-    Write-Warning "未检测到 claude CLI。MCP 自动注册会被跳过，稍后会打印手动注册命令。"
+foreach ($drv in @('C:', 'D:', 'E:', 'F:')) { $cands += ("{0}\Users\{1}\myWork" -f $drv, $env:USERNAME) }
+$resolved = $null
+foreach ($c in $cands) { if (HasPdk $c) { $resolved = $c; break } }     # 1) 已有克隆所在目录优先
+if (-not $resolved) {                                                   # 2) 全新机器：参数 > 配置 > 默认
+    if ($WorkspaceDir) { $resolved = $WorkspaceDir }
+    elseif (Test-Path $cfg) { $resolved = (((Get-Content $cfg -Raw) -replace "^\xEF\xBB\xBF", "")).Trim() }
+    else { $resolved = (Join-Path $env:USERPROFILE 'myWork') }
 }
+$WorkspaceDir = $resolved
+New-Item -ItemType Directory -Force -Path (Split-Path $cfg) | Out-Null
+[IO.File]::WriteAllText($cfg, $WorkspaceDir, $utf8)                     # 记住(无 BOM)，与 update 脚本共用
+
+# 结果分类（最后汇总；区分"本次新装" vs "已存在/已跳过 -> 去用更新 skill"）
+$newRepos = @();    $haveRepos = @()
+$newMcp = @();      $haveMcp = @()
+$newPlugins = @();  $havePlugins = @()
+
+Write-Host "==================================================" -ForegroundColor Cyan
+Write-Host " 公司团队工具一键【首次安装】（Gitee 源）" -ForegroundColor Cyan
+Write-Host " 已安装的不重装/不更新 —— 更新请用『更新公司套件』skill" -ForegroundColor DarkCyan
+Write-Host "==================================================" -ForegroundColor Cyan
+Write-Host "工作区目录: $WorkspaceDir"
+Write-Host "安装范围  : $Scope"
+if (-not $hasNode -or -not $hasNpm) { Write-Warning "未检测到 node/npm（>=18）。MCP 构建会被跳过，其余照常拉取。" }
+if (-not $hasClaude) { Write-Warning "未检测到 claude CLI。MCP/插件的自动安装会被跳过，稍后打印手动命令。" }
+Write-Host ""
 
 if (-not (Test-Path $WorkspaceDir)) {
     New-Item -ItemType Directory -Force -Path $WorkspaceDir | Out-Null
     Write-Host "已创建工作区目录: $WorkspaceDir"
 }
 
-# --- 第 1 步：拉取/更新全部仓库 ---
+# --- 第 1 步：克隆缺失的仓库（已存在则跳过，不 pull —— 更新交给 update skill）---
 Write-Host ""
-Write-Host "[1/3] 拉取/更新仓库 ..." -ForegroundColor Green
+Write-Host "[1/3] 克隆缺失仓库（已存在跳过）..." -ForegroundColor Green
 foreach ($r in $Repos) {
     $dest = Join-Path $WorkspaceDir $r.Name
     if (Test-Path (Join-Path $dest '.git')) {
-        Write-Host "  -> 更新 $($r.Name) (git pull)"
-        git -C $dest pull --ff-only
+        Write-Host "  = 已存在，跳过: $($r.Name)" -ForegroundColor DarkGray
+        $haveRepos += $r.Name
     }
     else {
-        Write-Host "  -> 克隆 $($r.Name) ($($r.Url))"
+        Write-Host "  + 克隆 $($r.Name) ($($r.Url))"
         git clone $r.Url $dest
+        $newRepos += $r.Name
     }
 }
 
-# --- 第 2 步：构建 project-domain-knowledge，并用同一引擎注册两个 MCP 实例 ---
+# --- 第 2 步：MCP（未注册才 build + 注册；已注册跳过，更新交给 update skill）---
 # 复用引擎：project-domain-knowledge 的 dist/server.js 是通用 md+frontmatter 知识引擎，
-# 用 DOMAIN_KB_DIR 环境变量指向不同知识根目录即可服务不同知识库。一份代码、两个实例：
-#   domain-knowledge -> 业务公共认知（project-domain-knowledge/knowledge）
-#   cross-topology   -> 跨项目拓扑   （cross-project-topology/knowledge）
+# 用 DOMAIN_KB_DIR 指向不同知识根目录 -> 一份代码两个实例：
+#   domain-knowledge -> 业务公共认知；cross-topology -> 跨项目拓扑
 Write-Host ""
-Write-Host "[2/3] 构建引擎并注册 MCP（domain-knowledge + cross-topology）..." -ForegroundColor Green
+Write-Host "[2/3] 注册 MCP（domain-knowledge + cross-topology，已注册跳过）..." -ForegroundColor Green
 $mcpDir = Join-Path $WorkspaceDir 'project-domain-knowledge'
 $mcpEntry = Join-Path $mcpDir 'dist\server.js'
 $domainKbDir = Join-Path $mcpDir 'knowledge'
 $topoDir = Join-Path $WorkspaceDir 'cross-project-topology'
 $topoKbDir = Join-Path $topoDir 'knowledge'
 
-# 用同一 server.js 注册一个 MCP 实例（幂等：先 remove 再 add），可带 DOMAIN_KB_DIR
-function Register-Mcp($name, $kbDir) {
-    Write-Host "  -> claude mcp add $name (DOMAIN_KB_DIR=$kbDir)"
-    claude mcp remove $name -s $McpScope 2>$null | Out-Null
-    if ($kbDir) {
-        claude mcp add $name -s $McpScope -e "DOMAIN_KB_DIR=$kbDir" -- node "$mcpEntry"
+$script:mcpList = if ($hasClaude) { (claude mcp list 2>$null | Out-String) } else { '' }
+function McpRegistered($n) { return $script:mcpList -match ("(?m)^\s*" + [regex]::Escape($n) + "\b") }
+
+$needDomain = $hasClaude -and -not (McpRegistered 'domain-knowledge')
+$needTopo   = $hasClaude -and (Test-Path $topoKbDir) -and -not (McpRegistered 'cross-topology')
+if ($hasClaude -and -not $needDomain) { $haveMcp += 'domain-knowledge' }
+if ($hasClaude -and (Test-Path $topoKbDir) -and -not $needTopo) { $haveMcp += 'cross-topology' }
+
+if (($needDomain -or $needTopo) -and $hasNode -and $hasNpm) {
+    if (-not (Test-Path $mcpEntry)) {
+        Push-Location $mcpDir
+        try { Write-Host "  -> npm install"; npm install; Write-Host "  -> npm run build"; npm run build }
+        finally { Pop-Location }
     }
-    else {
-        claude mcp add $name -s $McpScope -- node "$mcpEntry"
+    if (Test-Path $mcpEntry) {
+        # 注意：'--' 必须带引号，否则 PowerShell 会吞掉它（见文件头说明）
+        if ($needDomain) {
+            Write-Host "  + 注册 domain-knowledge (DOMAIN_KB_DIR=$domainKbDir)"
+            claude mcp add domain-knowledge -s $Scope -e "DOMAIN_KB_DIR=$domainKbDir" '--' node "$mcpEntry"
+            $newMcp += 'domain-knowledge'
+        }
+        if ($needTopo) {
+            Write-Host "  + 注册 cross-topology (DOMAIN_KB_DIR=$topoKbDir)"
+            claude mcp add cross-topology -s $Scope -e "DOMAIN_KB_DIR=$topoKbDir" '--' node "$mcpEntry"
+            $newMcp += 'cross-topology'
+        }
     }
+    else { Write-Warning "构建后未找到 $mcpEntry，跳过 MCP 注册。请检查 npm run build 是否成功。" }
+}
+elseif (($needDomain -or $needTopo) -and -not ($hasNode -and $hasNpm)) {
+    Write-Host "  (需注册 MCP 但缺少 node/npm，已跳过 build/注册)" -ForegroundColor DarkYellow
+}
+elseif (-not $hasClaude) {
+    Write-Host "  (claude CLI 缺失，MCP 注册已跳过)" -ForegroundColor DarkYellow
+}
+else {
+    Write-Host "  = MCP 已注册，跳过（更新走 update skill）" -ForegroundColor DarkGray
+}
+if ($hasClaude -and -not (Test-Path $topoKbDir)) {
+    Write-Warning "未找到 $topoKbDir（cross-project-topology 尚无 knowledge/ 根目录），cross-topology 未注册。内容就绪后用 update skill 刷新即可。"
 }
 
-if ($hasNode -and $hasNpm) {
-    Push-Location $mcpDir
-    try {
-        Write-Host "  -> npm install"
-        npm install
-        Write-Host "  -> npm run build"
-        npm run build
-    }
-    finally {
-        Pop-Location
-    }
-    if ($hasClaude) {
-        if (Test-Path $mcpEntry) {
-            # 实例 1：业务公共认知（默认根目录，省略 env 也行，这里显式指明更清楚）
-            Register-Mcp 'domain-knowledge' $domainKbDir
-            # 实例 2：跨项目拓扑——同一 server.js，DOMAIN_KB_DIR 指向 topology 仓库
-            if (Test-Path $topoKbDir) {
-                Register-Mcp 'cross-topology' $topoKbDir
-            }
-            else {
-                Write-Warning "未找到 $topoKbDir（cross-project-topology 尚未建立 knowledge/ 知识根目录），跳过 cross-topology 注册。内容就绪后重跑本脚本即可注册。"
-            }
+# --- 第 3 步：插件（claude plugin CLI 全自动；已安装跳过，更新交给 update skill）---
+Write-Host ""
+Write-Host "[3/3] 安装插件（claude plugin CLI，已安装跳过）..." -ForegroundColor Green
+if ($hasClaude) {
+    $pluginList = (claude plugin list 2>$null | Out-String)
+    $mktList    = (claude plugin marketplace list 2>$null | Out-String)
+    foreach ($p in $Plugins) {
+        $ref = "{0}@{0}" -f $p.Name
+        if ($pluginList -match [regex]::Escape($ref)) {
+            Write-Host "  = 已安装，跳过: $ref" -ForegroundColor DarkGray
+            $havePlugins += $p.Name
+            continue
         }
-        else {
-            Write-Warning "构建后未找到 $mcpEntry，跳过 MCP 注册。请检查 npm run build 是否成功。"
+        if (-not ($mktList -match [regex]::Escape($p.Name))) {
+            Write-Host "  + marketplace add $($p.Url)"
+            claude plugin marketplace add $p.Url
         }
+        Write-Host "  + plugin install $ref"
+        claude plugin install $ref -s $Scope
+        $newPlugins += $p.Name
     }
 }
 else {
-    Write-Host "  (已跳过：缺少 node/npm)"
+    Write-Warning "claude CLI 缺失，插件未安装。装好后执行（plugin 名须带 @marketplace 全限定）："
+    Write-Host "  claude plugin marketplace add https://gitee.com/wyoooni/team-standards.git"
+    Write-Host "  claude plugin install team-standards@team-standards -s $Scope"
+    Write-Host "  claude plugin marketplace add https://gitee.com/wyoooni/project-coding-profiles.git"
+    Write-Host "  claude plugin install project-coding-profiles@project-coding-profiles -s $Scope"
 }
 
-# --- 第 3 步：插件安装命令（slash 命令需在 Claude Code 里手动执行）---
+# --- 汇总 ---
 Write-Host ""
-Write-Host "[3/3] 安装两个插件（在 Claude Code 会话里执行以下 slash 命令）" -ForegroundColor Green
-Write-Host "----------------------------------------------------------------" -ForegroundColor DarkGray
-Write-Host "/plugin marketplace add https://gitee.com/wyoooni/team-standards.git"
-Write-Host "/plugin install team-standards@team-standards"
-Write-Host ""
-Write-Host "/plugin marketplace add https://gitee.com/wyoooni/project-coding-profiles.git"
-Write-Host "/plugin install project-coding-profiles@project-coding-profiles"
-Write-Host ""
-Write-Host "/reload-plugins"
-Write-Host "----------------------------------------------------------------" -ForegroundColor DarkGray
-
-Write-Host ""
-Write-Host "完成。" -ForegroundColor Cyan
-Write-Host "已就绪的本地仓库（在 $WorkspaceDir 下）："
-foreach ($r in $Repos) { Write-Host "  - $($r.Name)  [$($r.Type)]" }
-if (-not $hasClaude) {
+Write-Host "==================== 安装结果 ====================" -ForegroundColor Cyan
+if ($newRepos.Count)   { Write-Host ("新克隆仓库 : " + ($newRepos -join ', ')) -ForegroundColor Green }
+if ($newMcp.Count)     { Write-Host ("新注册 MCP : " + ($newMcp -join ', ')) -ForegroundColor Green }
+if ($newPlugins.Count) { Write-Host ("新安装插件 : " + ($newPlugins -join ', ')) -ForegroundColor Green }
+if (-not ($newRepos.Count -or $newMcp.Count -or $newPlugins.Count)) {
+    Write-Host "本次没有新安装项——全部已就绪。" -ForegroundColor Green
+}
+if ($haveRepos.Count -or $haveMcp.Count -or $havePlugins.Count) {
     Write-Host ""
-    Write-Warning "claude CLI 缺失，MCP 未自动注册。装好 claude CLI 后手动执行（同一 server.js，两个实例）："
-    Write-Host "  claude mcp add domain-knowledge -s $McpScope -e `"DOMAIN_KB_DIR=$domainKbDir`" -- node `"$mcpEntry`""
-    Write-Host "  claude mcp add cross-topology   -s $McpScope -e `"DOMAIN_KB_DIR=$topoKbDir`" -- node `"$mcpEntry`""
+    Write-Host "以下已安装，本脚本未改动（不重装/不更新）：" -ForegroundColor DarkCyan
+    if ($haveRepos.Count)   { Write-Host ("  仓库 : " + ($haveRepos -join ', ')) }
+    if ($haveMcp.Count)     { Write-Host ("  MCP  : " + ($haveMcp -join ', ')) }
+    if ($havePlugins.Count) { Write-Host ("  插件 : " + ($havePlugins -join ', ')) }
+    Write-Host ""
+    Write-Host ">> 需要更新？别重跑安装——用『更新公司套件』skill(yoooni-update-team-tools)，" -ForegroundColor Yellow
+    Write-Host "  或直接跑 scripts\update-team-tools.ps1（git pull + 重建 MCP + claude plugin update）。" -ForegroundColor Yellow
 }
+if ($newPlugins.Count) {
+    Write-Host ""
+    Write-Host "插件已安装，重启 Claude Code 会话后生效（或 /reload-plugins）。" -ForegroundColor Cyan
+}
+Write-Host "==================================================" -ForegroundColor Cyan

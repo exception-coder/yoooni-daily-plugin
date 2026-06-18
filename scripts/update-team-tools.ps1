@@ -1,11 +1,14 @@
 ﻿<#
 .SYNOPSIS
-  自动刷新公司团队套件「可脚本化部分」——两个 MCP 仓(普通命令，无需 slash)：
-    git pull project-domain-knowledge / cross-project-topology
-    若 project-domain-knowledge 有更新 -> npm install + npm run build
-    幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
-  插件(team-standards / project-coding-profiles)走 /plugin slash，脚本代不了——
-  仅当本地有插件源码且落后远程时，写提示到 notice 文件，由 hook/skill 浮现。
+  全自动刷新公司团队套件，两部分都无需任何 slash / 手动操作：
+    [MCP 仓] git pull project-domain-knowledge / cross-project-topology
+             若 project-domain-knowledge 有更新 -> npm install + npm run build
+             幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
+    [插件]   claude plugin marketplace update 刷新源 ->
+             claude plugin update <plugin>@<marketplace> 逐个更新
+             (team-standards / project-coding-profiles / yoooni-daily-plugin)，
+             幂等(已最新则空跑)，有更新写 notice 提示「重启会话生效」。
+  注：`claude plugin` 现已是完整 CLI，插件更新可全脚本化；早期"插件只能走 slash"的限制已不再适用。
 .NOTES 被 SessionStart hook(每日后台)、Windows 计划任务、update-team-tools skill 共用。
 #>
 param(
@@ -68,26 +71,31 @@ if ($anyChanged -and (Has claude) -and (Test-Path $entry)) {
   $domainKb = Join-Path $mcpDir 'knowledge'
   $topoKb   = Join-Path $topoDir 'knowledge'
   claude mcp remove domain-knowledge -s $McpScope 2>$null | Out-Null
-  claude mcp add domain-knowledge -s $McpScope -e "DOMAIN_KB_DIR=$domainKb" -- node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
+  # '--' 必须带引号：裸 -- 会被 PowerShell 吞掉，导致变参 -e 吞掉 node+路径而报 missing commandOrUrl
+  claude mcp add domain-knowledge -s $McpScope -e "DOMAIN_KB_DIR=$domainKb" '--' node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
   if (Test-Path $topoKb) {
     claude mcp remove cross-topology -s $McpScope 2>$null | Out-Null
-    claude mcp add cross-topology -s $McpScope -e "DOMAIN_KB_DIR=$topoKb" -- node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
+    claude mcp add cross-topology -s $McpScope -e "DOMAIN_KB_DIR=$topoKb" '--' node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
   }
 }
 
-$pluginMsgs = @()
-foreach ($p in @('team-standards','project-coding-profiles')) {
-  $pd = Join-Path $WorkspaceDir $p
-  if (Test-Path (Join-Path $pd '.git')) {
-    git -C $pd fetch --quiet 2>$null
-    $localRev  = (git -C $pd rev-parse '@' 2>$null)
-    $remoteRev = (git -C $pd rev-parse '@{u}' 2>$null)
-    if ($localRev -and $remoteRev -and ($localRev -ne $remoteRev)) { $pluginMsgs += $p }
+# --- 插件：claude plugin 现为完整 CLI，可全自动更新(无需本地克隆源码，直接走已注册 marketplace) ---
+# 必须用全限定名 plugin@marketplace(裸名会报 not found)；先 marketplace update 刷源，再逐个 update。
+# 公司三插件的 marketplace 名与插件名一致 -> 用 "{0}@{0}"。
+$pluginUpdated = @()
+if (Has claude) {
+  claude plugin marketplace update 2>&1 | ForEach-Object { Log ("  mkt " + $_) }
+  foreach ($p in @('team-standards','project-coding-profiles','yoooni-daily-plugin')) {
+    $ref = "{0}@{0}" -f $p
+    $out = (claude plugin update $ref -s $McpScope 2>&1 | Out-String)
+    ($out -split "`r?`n") | Where-Object { $_.Trim() } | ForEach-Object { Log ("  plg " + $_.Trim()) }
+    $mm = [regex]::Match($out, 'updated from\s+(\S+)\s+to\s+(\S+)')
+    if ($mm.Success) { $pluginUpdated += ("{0} {1}→{2}" -f $p, $mm.Groups[1].Value, $mm.Groups[2].Value) }
   }
 }
-if ($pluginMsgs.Count -gt 0) {
-  [IO.File]::WriteAllText($notice, ("团队插件有新版({0})：在 Claude Code 里说『更新公司套件』或跑 /plugin marketplace update 后重装。" -f ($pluginMsgs -join ' / ')), $utf8)
+if ($pluginUpdated.Count -gt 0) {
+  [IO.File]::WriteAllText($notice, ("团队插件已自动更新：{0}。重启 Claude Code 会话即生效。" -f ($pluginUpdated -join '；')), $utf8)
 } else {
   [IO.File]::WriteAllText($notice, "", $utf8)
 }
-Log "=== update done (pdkChanged=$pdkChanged) ==="
+Log ("=== update done (pdkChanged={0}, pluginsUpdated={1}) ===" -f $pdkChanged, $pluginUpdated.Count)

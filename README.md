@@ -111,8 +111,8 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 - "新机器配置公司开发规范" / "拉一下公司的 plugin 和 mcp"
 
 **核心功能**（公司当前用 **Gitee** 管理源码，安装地址一律用 Gitee）：
-- 一键脚本 `install-team-tools.ps1`：克隆/更新四个仓库（幂等，重复运行安全）
-- **2 个插件**（marketplace + install）：team-standards（团队编码规范）、project-coding-profiles（项目编码画像）
+- 一键脚本 `install-team-tools.ps1`：**只首次安装缺失项**——克隆缺失仓库（已存在跳过、不 pull）、未注册才 `claude mcp add`、未安装才 `claude plugin install`；**已装的一律跳过、不重装，更新请用 update skill**。工作区目录自动定位（复用已克隆目录，避免重复 clone 到 C 盘）。
+- **2 个插件**（`claude plugin marketplace add` + `claude plugin install` CLI 自动装）：team-standards（团队编码规范）、project-coding-profiles（项目编码画像）
 - **2 个 MCP 实例，复用同一引擎**：project-domain-knowledge 的 `dist/server.js` 是通用 md+frontmatter 知识引擎，靠 `DOMAIN_KB_DIR` 指向不同知识根目录，注册成两个实例——
   - `domain-knowledge` → 业务公共认知（project-domain-knowledge）
   - `cross-topology` → 跨项目拓扑（cross-project-topology，借同一 server.js，无需自己 build）
@@ -124,7 +124,7 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 | project-domain-knowledge | MCP 引擎 + 业务认知 | `https://gitee.com/wyoooni/project-domain-knowledge.git` |
 | cross-project-topology | MCP（复用引擎）跨项目拓扑 | `https://gitee.com/wyoooni/cross-project-topology.git` |
 
-> 插件用 `/plugin` slash 命令安装（脚本无法代敲，需在 Claude Code 会话执行）；两个 MCP 实例与克隆部分由脚本自动完成。cross-topology 需 cross-project-topology 仓库建立 `knowledge/` 知识根目录（frontmatter 含 `id` 的 .md）后才有内容可服务。
+> 插件首次安装可在会话里 `/plugin marketplace add` + `/plugin install`，也可用 `claude plugin marketplace add` + `claude plugin install` CLI（新版 `claude plugin` 已是完整子命令）；后续**更新全自动**（见下方 update skill）。两个 MCP 实例与克隆部分由脚本自动完成。cross-topology 需 cross-project-topology 仓库建立 `knowledge/` 知识根目录（frontmatter 含 `id` 的 .md）后才有内容可服务。
 
 详见 [skills/yoooni-install-team-tools/SKILL.md](skills/yoooni-install-team-tools/SKILL.md)
 
@@ -134,10 +134,10 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 - "更新公司套件" / "更新团队工具" / "刷新插件和 MCP" / "同步最新规范"
 - "开启自动更新" / "装个定时自动更新" / "关掉自动更新" / "团队工具有没有新版"
 
-**核心功能**（装一个插件 → AI 自动维护全套；诚实分层）：
+**核心功能**（装一个插件 → AI 全自动维护全套）：
 - **MCP 层全自动**：`SessionStart` hook（`hooks/session-autoupdate.js`）每开 Claude Code、每天最多一次在**后台**（不阻塞会话）`git pull` 两个 MCP 仓（project-domain-knowledge 引擎 / cross-project-topology 知识）→ 引擎有变化才重建 → 幂等重注册。仓库目录自动定位（能从 `claude mcp get` 解析真实路径，解决默认 C 盘找不到 D 盘仓库的问题）。
-- **插件层半自动**：插件装/更新走 `/plugin` slash 命令、脚本代不了；检测到新版会把提示带进会话上下文，本 skill 一键打印 `/plugin marketplace update` + `install` 命令让你点一下。
-- **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、每 4 小时），Claude Code 没开也保持 MCP 最新。
+- **插件层全自动**：同一脚本走 `claude plugin marketplace update` 刷源 → `claude plugin update <plugin>@<marketplace>` 逐个更新（team-standards / project-coding-profiles / yoooni-daily-plugin，幂等，已最新则空跑）。**更新后重启会话生效**，notice 会提示。（`claude plugin` 现为完整 CLI，"插件只能走 slash"的旧限制已废弃；插件名须带 `@marketplace` 全限定。）
+- **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、每 4 小时），Claude Code 没开也保持 MCP + 插件最新。
 - 开关：环境变量 `YOOONI_AUTOUPDATE=off` 关闭、`=now` 立即刷一次。日志在 `%USERPROFILE%\.kai-toolbox\team-tools-update.log`。
 
 详见 [skills/yoooni-update-team-tools/SKILL.md](skills/yoooni-update-team-tools/SKILL.md)
@@ -216,7 +216,7 @@ yoooni-daily-plugin/
 │   ├── hooks.json               # SessionStart 自动更新 hook 声明
 │   └── session-autoupdate.js    # 每日后台刷新 MCP 仓 + 浮现插件新版提示
 ├── scripts/
-│   ├── update-team-tools.ps1    # 同步脚本：pull 2 个 MCP 仓 + 必要时重建 + 幂等重注册
+│   ├── update-team-tools.ps1    # 同步脚本：pull 2 个 MCP 仓 + 必要时重建/重注册 + claude plugin update 自动更新插件
 │   └── register-autoupdate-task.ps1 # 注册 Windows 计划任务（schtasks，每 4 小时）
 ├── .gitignore
 ├── CLAUDE.md                # 维护指引
@@ -225,6 +225,14 @@ yoooni-daily-plugin/
 
 ## 升级已装插件
 
+通常**无需手动**——本插件的 SessionStart hook / 计划任务会用 `claude plugin update` 自动更新全套（含本插件自身），更新后重启会话生效。
+
+需要手动立即更新时，CLI（脚本可代劳）：
+```
+claude plugin marketplace update
+claude plugin update yoooni-daily-plugin@yoooni-daily-plugin -s user
+```
+或会话内 slash：
 ```
 /plugin marketplace update yoooni-daily-plugin
 /plugin install yoooni-daily-plugin@yoooni-daily-plugin
