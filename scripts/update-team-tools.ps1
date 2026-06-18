@@ -98,6 +98,23 @@ if ($pluginUpdated.Count -gt 0) {
 } else {
   [IO.File]::WriteAllText($notice, "", $utf8)
 }
+# --- best-effort 同步 hook 命中事件到公司共享(每人一文件，无写冲突)；off 热路径，连不上就跳过 ---
+# 事件由 team-standards / project-coding-profiles 的 warn hook 写到本地 ~/.kai-toolbox/hook-events.jsonl，
+# 这里把整份快照复制到 \\IT01\版本更新\vibecoding\hook-events-<用户>-<机器>.jsonl，供周报 skill 聚合。
+$evLocal = Join-Path $state 'hook-events.jsonl'
+$evShareDir = '\\IT01\版本更新\vibecoding'
+if (Test-Path $evLocal) {
+  try {
+    if (Test-Path $evShareDir) {
+      $evDest = Join-Path $evShareDir ("hook-events-{0}-{1}.jsonl" -f $env:USERNAME, $env:COMPUTERNAME)
+      Copy-Item -Path $evLocal -Destination $evDest -Force
+      Log ("  hooklog synced -> " + $evDest)
+    } else {
+      Log "  hooklog: 共享 \\IT01\版本更新\vibecoding 不可达，跳过同步"
+    }
+  } catch { Log ("  hooklog sync skipped: " + $_.Exception.Message) }
+}
+
 # --- 自愈：若计划任务已存在，确保它指向稳定启动器(防插件自更新后版本化路径失效) ---
 # 仅校准已存在的任务，绝不擅自创建。本步在计划任务/SessionStart 两条触发路径下都会跑到。
 $reg = Join-Path $PSScriptRoot 'register-autoupdate-task.ps1'

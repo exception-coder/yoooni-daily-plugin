@@ -1,6 +1,6 @@
 # yoooni-daily-plugin
 
-Yoooni 团队日常工作 Claude Code 插件。包含 **8 个 Skill** + **SessionStart 自动更新 hook**（每日后台刷新公司 MCP 仓），后续按需扩展。
+Yoooni 团队日常工作 Claude Code 插件。包含 **9 个 Skill** + **SessionStart 自动更新 hook**（每日后台刷新公司 MCP 仓），后续按需扩展。
 
 ## 快速开始（60 秒）
 
@@ -39,6 +39,7 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 | [yoooni-update-team-tools](skills/yoooni-update-team-tools/SKILL.md) | 更新/同步公司套件 + 自动更新（MCP 自动、插件一键） | "更新公司套件"、"刷新插件和 MCP"、"开启自动更新"、"装个定时自动更新" |
 | [yoooni-prod-log-query](skills/yoooni-prod-log-query/SKILL.md) | 查生产后台接口注册日志（apiRegistrylog）排查线上 | "查生产日志"、"查接口日志"、"排查线上 XX 接口"、"apiRegistrylog" |
 | [yoooni-taskspace](skills/yoooni-taskspace/SKILL.md) | 跨目录任务空间：选择多个项目并用链接聚合到一个工作区 | "创建任务空间"、"合并几个项目"、"一键选择创建软链接"、"taskspace" |
+| [yoooni-hook-report](skills/yoooni-hook-report/SKILL.md) | hook 命中周报：聚合 \\IT01 共享里的 warn hook 命中事件出统计，定升不升 block | "hook 命中周报"、"规则命中排行"、"大家踩了哪些规范"、"哪条规则该升 block" |
 
 ## Skills 详细说明
 
@@ -138,6 +139,7 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 - **MCP 层全自动**：`SessionStart` hook（`hooks/session-autoupdate.js`）每开 Claude Code、每天最多一次在**后台**（不阻塞会话）`git pull` 两个 MCP 仓（project-domain-knowledge 引擎 / cross-project-topology 知识）→ 引擎有变化才重建 → 幂等重注册。仓库目录自动定位（能从 `claude mcp get` 解析真实路径，解决默认 C 盘找不到 D 盘仓库的问题）。
 - **插件层全自动**：同一脚本走 `claude plugin marketplace update` 刷源 → `claude plugin update <plugin>@<marketplace>` 逐个更新（team-standards / project-coding-profiles / yoooni-daily-plugin，幂等，已最新则空跑）。**更新后重启会话生效**，notice 会提示。（`claude plugin` 现为完整 CLI，"插件只能走 slash"的旧限制已废弃；插件名须带 `@marketplace` 全限定。）
 - **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、每 4 小时），Claude Code 没开也保持 MCP + 插件最新。任务指向**固定路径的稳定启动器** `%USERPROFILE%\.kai-toolbox\run-update.ps1`（运行时再定位最新版脚本），避免本插件自更新后版本化缓存路径失效导致任务断链；`update-team-tools.ps1` 每次跑完会**自愈校准**任务（仅当任务已存在）。
+- **hook 命中日志上报**：同一脚本顺手把本地 `~/.kai-toolbox/hook-events.jsonl`（team-standards / project-coding-profiles 的 warn hook 命中时写入）best-effort 同步到 `\\IT01\版本更新\vibecoding\hook-events-<用户>-<机器>.jsonl`（每人一文件，连不上就跳过）。用 `yoooni-hook-report` skill 聚合出周报。
 - 开关：环境变量 `YOOONI_AUTOUPDATE=off` 关闭、`=now` 立即刷一次。日志在 `%USERPROFILE%\.kai-toolbox\team-tools-update.log`。
 
 详见 [skills/yoooni-update-team-tools/SKILL.md](skills/yoooni-update-team-tools/SKILL.md)
@@ -180,6 +182,20 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 
 详见 [skills/yoooni-taskspace/SKILL.md](skills/yoooni-taskspace/SKILL.md)
 
+### yoooni-hook-report — hook 命中周报
+
+**触发短语**：
+- "hook 命中周报" / "hook 命中统计" / "规则命中排行"
+- "大家踩了哪些规范" / "哪条规则该升 block" / "warn 统计" / "看看 vibecoding 日志"
+
+**核心功能**（用数据决定 warn 规则要不要升 block）：
+- 读公司共享 `\\IT01\版本更新\vibecoding` 下各人上报的 `hook-events-<用户>-<机器>.jsonl`，用 `hook-report.mjs` 聚合
+- 输出五张表：规则命中 Top、谁命中最多、warn vs block、按 hook、按插件
+- 数据闭环：warn hook（team-standards / project-coding-profiles）命中 → 本地 `~/.kai-toolbox/hook-events.jsonl` → `update-team-tools.ps1` best-effort 同步到共享（每人一文件）→ 本 skill 聚合
+- 只读不写；需能访问 `\\IT01`（访问不了先跑 `yoooni-smb-share-access` 修 SMB）
+
+详见 [skills/yoooni-hook-report/SKILL.md](skills/yoooni-hook-report/SKILL.md)
+
 ## 目录结构
 
 ```
@@ -209,9 +225,12 @@ yoooni-daily-plugin/
 │   ├── yoooni-prod-log-query/    # 生产日志查询 skill（接口注册日志排查）
 │   │   ├── SKILL.md
 │   │   └── query-prod-log.ps1   # 查询脚本：账号密码自动登录 + 表单参数 + 翻页合并
-│   └── yoooni-taskspace/         # 跨目录任务空间 skill（junction/symlink 聚合项目）
+│   ├── yoooni-taskspace/         # 跨目录任务空间 skill（junction/symlink 聚合项目）
+│   │   ├── SKILL.md
+│   │   └── taskspace.mjs        # 创建/查看/追加/移除/拆除任务空间
+│   └── yoooni-hook-report/       # hook 命中周报 skill（聚合 \\IT01 共享事件）
 │       ├── SKILL.md
-│       └── taskspace.mjs        # 创建/查看/追加/移除/拆除任务空间
+│       └── hook-report.mjs      # 读 hook-events-*.jsonl 出规则命中/warn-block 统计
 ├── hooks/
 │   ├── hooks.json               # SessionStart 自动更新 hook 声明
 │   └── session-autoupdate.js    # 每日后台刷新 MCP 仓 + 浮现插件新版提示
