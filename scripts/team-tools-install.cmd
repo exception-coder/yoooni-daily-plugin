@@ -5,7 +5,7 @@ echo ==================================================
 echo   Company Team Tools - One-click Install
 echo ==================================================
 echo.
-echo Requirements: Git (required) ; Node.js+npm (>=18) and Claude CLI (recommended).
+echo Requirements: Git (required); Node.js 18+ with npm; Claude CLI (recommended).
 echo The installer below lists any missing item with its install link.
 echo.
 if not exist "%~dp0bootstrap-install.ps1" (
