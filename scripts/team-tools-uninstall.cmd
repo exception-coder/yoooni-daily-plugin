@@ -11,12 +11,17 @@ echo   MCP    : domain-knowledge / cross-topology
 echo   task   : YoooniTeamToolsAutoUpdate
 echo Source repos are KEPT. frontend-design / claude.ai are NOT touched.
 echo.
+if not exist "%~dp0uninstall-team-tools.ps1" (
+  echo [ERROR] uninstall-team-tools.ps1 NOT found next to this .cmd.
+  echo Keep team-tools-uninstall.cmd and uninstall-team-tools.ps1 in the SAME folder.
+  echo.
+  pause
+  exit /b 1
+)
 echo Press any key to CONFIRM uninstall, or close this window to cancel.
 pause >nul
 echo.
-echo Downloading and running the uninstaller from Gitee...
-echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { irm 'https://gitee.com/wyoooni/yoooni-daily-plugin/raw/master/scripts/uninstall-team-tools.ps1' -OutFile '%TEMP%\yoooni-uninstall.ps1'; & '%TEMP%\yoooni-uninstall.ps1' } catch { Write-Host ('Download/run failed: ' + $_.Exception.Message) -ForegroundColor Red }"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall-team-tools.ps1"
 echo.
 echo ==================================================
 echo Done. Restart Claude Code session for full effect.

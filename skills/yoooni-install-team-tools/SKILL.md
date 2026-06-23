@@ -15,10 +15,14 @@ description: 一键拉取并安装公司团队工具（全部走 Gitee 源）。
 
 `install-team-tools.ps1` 跑在**本体插件内部**，所以装不了本体自己、也不注册定时更新。**全新机器**请用引导脚本 `scripts/bootstrap-install.ps1`——它在 install-team-tools.ps1 之上多做两件事：(1) 克隆 + 安装**本体 `yoooni-daily-plugin`**；(2) 注册**定时自动更新**任务（默认每 1 小时）；中间的「关联插件 + MCP」直接委托 install-team-tools.ps1（幂等、已装跳过），不重复实现。
 
+发给同事（Gitee 仓库私有，raw 链接 403，故走「发文件 + 双击」模式）：把 `scripts/` 下这两对文件打包发过去，双击 `.cmd` 即可——
+- 安装：`team-tools-install.cmd` + `bootstrap-install.ps1`（同一文件夹）
+- 卸载：`team-tools-uninstall.cmd` + `uninstall-team-tools.ps1`（同一文件夹）
+
+`.cmd` 双击运行同目录的 `.ps1`；`bootstrap` 内部用 `git clone` 拉仓库（用同事自己的 Gitee 凭据，首次提示登录、之后缓存）。本机直接跑也可：
+
 ```powershell
-# 全新机器：下载引导脚本再运行（之后全自动）
-$u='https://gitee.com/wyoooni/yoooni-daily-plugin/raw/master/scripts/bootstrap-install.ps1'
-irm $u -OutFile "$env:TEMP\boot.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\boot.ps1"
+powershell -ExecutionPolicy Bypass -File .\bootstrap-install.ps1
 ```
 
 - 已装好本体的机器，只想补装关联工具 / 重复跑安装 → 仍用下面的 `install-team-tools.ps1`（幂等）。

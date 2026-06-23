@@ -18,11 +18,13 @@
 .PARAMETER GiteeBase    Gitee 组织地址前缀，默认 https://gitee.com/wyoooni 。
 
 .EXAMPLE
-  # 全新机器：先下载本文件再运行
-  $u='https://gitee.com/wyoooni/yoooni-daily-plugin/raw/master/scripts/bootstrap-install.ps1'
-  irm $u -OutFile "$env:TEMP\boot.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\boot.ps1"
+  # 发同事：把本文件 + team-tools-install.cmd 放同一文件夹，双击 .cmd 即可
+  powershell -ExecutionPolicy Bypass -File .\bootstrap-install.ps1
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\bootstrap-install.ps1 -WorkspaceDir D:\Users\me\myWork -EveryHours 1
+.NOTES
+  Gitee 仓库为私有，raw 链接对外 403；故走「发文件 + git clone」模式（git clone 用同事自己的 Gitee 凭据，
+  首次会提示登录、之后缓存）。不要用 irm raw 下载本脚本。
 #>
 param(
     [string]$WorkspaceDir,
