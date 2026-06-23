@@ -1,6 +1,6 @@
 ---
 name: yoooni-install-team-tools
-description: 一键拉取并安装公司团队工具（全部走 Gitee 源）。当用户说"安装公司插件/MCP"、"拉一下团队工具"、"装 team-standards / project-coding-profiles / project-domain-knowledge / cross-project-topology"、"配置公司开发规范插件"、"一键安装团队规范"、"新机器装一下团队插件"时触发。覆盖：两个 Claude Code 插件（team-standards 编码规范、project-coding-profiles 编码画像）+ 两个 MCP 实例（同一引擎：domain-knowledge 业务认知 + cross-topology 跨项目拓扑）。脚本全自动（仓库 git clone + MCP 注册 + 插件 claude plugin CLI 安装），已安装的一律跳过、不重装、不更新——若检测到已安装，改用『更新公司套件』skill(yoooni-update-team-tools)。公司当前用 Gitee 管理源码，安装地址一律用 Gitee。
+description: 一键拉取并安装公司团队工具（全部走 Gitee 源）。当用户说"安装公司插件/MCP"、"拉一下团队工具"、"装 team-standards / project-coding-profiles / project-domain-knowledge / cross-project-topology"、"配置公司开发规范插件"、"一键安装团队规范"、"新机器装一下团队插件"时触发。覆盖：两个 Claude Code 插件（team-standards 编码规范、project-coding-profiles 编码画像）+ 两个 MCP 实例（同一引擎：domain-knowledge 业务认知 + cross-topology 跨项目拓扑）。脚本全自动（仓库 git clone + MCP 注册 + 插件 claude plugin CLI 安装），已安装的一律跳过、不重装、不更新——若检测到已安装，改用『更新公司套件』skill(yoooni-update-team-tools)。公司当前用 Gitee 管理源码，安装地址一律用 Gitee。全新机器用 scripts/bootstrap-install.ps1 一键引导（含本体 yoooni-daily-plugin 自身 + 定时自动更新注册），已装本体的机器才用 install-team-tools.ps1。
 ---
 
 # 一键安装公司团队工具 Skill（首次安装专用）
@@ -10,6 +10,20 @@ description: 一键拉取并安装公司团队工具（全部走 Gitee 源）。
 > **职责边界（重要）**：本 skill 只负责【首次安装缺失的部分】。
 > **已安装的一律跳过，不重装、不更新。** 需要更新请改用 `yoooni-update-team-tools`（『更新公司套件』），
 > 它会 `git pull` + 重建 MCP + `claude plugin update`。**别用安装脚本来"更新"。**
+
+## 全新机器：一键引导脚本（含本体 + 定时自动更新）
+
+`install-team-tools.ps1` 跑在**本体插件内部**，所以装不了本体自己、也不注册定时更新。**全新机器**请用引导脚本 `scripts/bootstrap-install.ps1`——它在 install-team-tools.ps1 之上多做两件事：(1) 克隆 + 安装**本体 `yoooni-daily-plugin`**；(2) 注册**定时自动更新**任务（默认每 1 小时）；中间的「关联插件 + MCP」直接委托 install-team-tools.ps1（幂等、已装跳过），不重复实现。
+
+```powershell
+# 全新机器：下载引导脚本再运行（之后全自动）
+$u='https://gitee.com/wyoooni/yoooni-daily-plugin/raw/master/scripts/bootstrap-install.ps1'
+irm $u -OutFile "$env:TEMP\boot.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\boot.ps1"
+```
+
+- 已装好本体的机器，只想补装关联工具 / 重复跑安装 → 仍用下面的 `install-team-tools.ps1`（幂等）。
+- 只改更新周期（不重装）→ `scripts\register-autoupdate-task.ps1 -EveryHours <小时>`（内容稳定后建议从 1 改回 2~4）。
+- 定时任务是「会话外也保持最新」的兜底；「开 Claude Code 即刷新」由 SessionStart hook 负责，二者互补。
 
 ## AI 触发本 skill 时的判断逻辑
 
