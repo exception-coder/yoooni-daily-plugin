@@ -1,0 +1,17 @@
+公司团队套件 · 一键安装 / 卸载（双击运行）
+================================================
+
+【前提】先装好这三样（缺啥安装脚本会列出来并给链接）：
+  - Git（必需）        https://git-scm.com/download/win
+  - Node.js（>=18）    https://nodejs.org/zh-cn
+  - Claude Code CLI    装好 Node 后：npm install -g @anthropic-ai/claude-code
+
+【安装】双击  team-tools-install.cmd
+【卸载】双击  team-tools-uninstall.cmd
+
+【说明】
+  1. 首次安装，git 会弹窗让你登录 Gitee（公司私有仓），输一次账号即可，之后自动记住。
+  2. 安装会自动：装公司插件 + 知识库 MCP + 配置每 1 小时同步最新规范。
+  3. 装完 / 卸载完，请【重启 Claude Code 会话】生效。
+  4. .cmd 必须和同名 .ps1 放在同一文件夹（本压缩包已放好，别拆开）。
+  5. 卸载只摘公司这套（插件 / MCP / 定时任务），不动你别的插件，也默认保留已下载的源码。

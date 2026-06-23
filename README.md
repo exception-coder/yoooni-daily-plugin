@@ -14,6 +14,31 @@ Yoooni 团队日常工作 Claude Code 插件。包含 **9 个 Skill** + **Sessio
 
 装好后即可使用。直接说"我是新同事怎么开始"进入入职路线图第一步。
 
+> 上面的 `/plugin` 命令是**已经在 Claude Code 里**时用的（只装本体）。**全新机器**请用下面的「一键装齐」。
+
+## 🚀 全新机器：一键装齐公司套件（发同事 / 双击）
+
+**必要依赖**（先装好；缺啥安装脚本会自动列出来并给安装链接）：
+
+| 依赖 | 必需? | 获取方式 |
+|---|---|---|
+| Git | ✅ 必需 | https://git-scm.com/download/win  ·  或 `winget install Git.Git` |
+| Node.js ≥18（含 npm） | 建议 | https://nodejs.org/zh-cn  ·  或 `winget install OpenJS.NodeJS.LTS`（构建知识库 MCP 用） |
+| Claude Code CLI | 建议 | 装好 Node 后执行 `npm install -g @anthropic-ai/claude-code`（装插件 + 注册 MCP 用） |
+
+**安装步骤**：
+
+1. 找管理员要压缩包 **`公司团队套件-一键安装卸载.zip`**，解压到任意文件夹。
+2. 双击 **`team-tools-install.cmd`**。
+3. 首次会弹 **Gitee 登录**（公司私有仓），输一次账号即可，之后自动记住。
+4. 跑完**重启 Claude Code 会话**生效（或 `/reload-plugins`）。
+
+一步装齐：**本体 `yoooni-daily-plugin` + `team-standards` + `project-coding-profiles` 两个插件 + `domain-knowledge` / `cross-topology` 两个知识库 MCP + 每 1 小时自动同步最新规范**。
+
+**卸载**：双击 **`team-tools-uninstall.cmd`**（只摘公司这套，不动你其它插件，默认保留已下载源码）。
+
+> 公司 Gitee 仓库为私有，所以走「发压缩包 + 双击」而非网上一行命令。脚本源码在 [scripts/](scripts/)：`bootstrap-install.ps1`（安装）/ `uninstall-team-tools.ps1`（卸载）+ 同名 `.cmd` 双击启动器。`.cmd` 必须和同名 `.ps1` 放在同一文件夹。
+
 ## 🧭 入职路线图（新同事按此顺序走）
 
 ```
