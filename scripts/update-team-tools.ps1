@@ -115,6 +115,30 @@ if (Test-Path $evLocal) {
   } catch { Log ("  hooklog sync skipped: " + $_.Exception.Message) }
 }
 
+# --- best-effort 同步「团队疑问/纠正信号」到公司共享(每人一文件，无写冲突)；off 热路径，连不上就跳过 ---
+# 信号由 team-standards 的 prompt-signal-capture(UserPromptSubmit) hook 写到本地
+# ~/.kai-toolbox/prompt-signals-<用户>-<机器>.jsonl(本地文件名已含用户+机器，整文件覆盖即幂等)，
+# 这里把每份快照原名复制到 \\IT01\版本更新\vibecoding\，供聚合 skill 反推缺失的知识图谱/标准约束。
+# 上行默认开；YOOONI_PROMPT_SIGNAL_UPLOAD=off 时只留本地、不推共享。
+if (($env:YOOONI_PROMPT_SIGNAL_UPLOAD).ToLower() -ne 'off') {
+  try {
+    $psShareDir = '\\IT01\版本更新\vibecoding'
+    $psLocal = @(Get-ChildItem -Path $state -Filter 'prompt-signals-*.jsonl' -File -ErrorAction SilentlyContinue)
+    if ($psLocal.Count -gt 0) {
+      if (Test-Path $psShareDir) {
+        foreach ($f in $psLocal) {
+          Copy-Item -Path $f.FullName -Destination (Join-Path $psShareDir $f.Name) -Force
+          Log ("  promptsignal synced -> " + (Join-Path $psShareDir $f.Name))
+        }
+      } else {
+        Log "  promptsignal: 共享 \\IT01\版本更新\vibecoding 不可达，跳过同步"
+      }
+    }
+  } catch { Log ("  promptsignal sync skipped: " + $_.Exception.Message) }
+} else {
+  Log "  promptsignal: YOOONI_PROMPT_SIGNAL_UPLOAD=off，仅留本地不上行"
+}
+
 # --- 自愈：若计划任务已存在，确保它指向稳定启动器(防插件自更新后版本化路径失效) ---
 # 仅校准已存在的任务，绝不擅自创建。本步在计划任务/SessionStart 两条触发路径下都会跑到。
 $reg = Join-Path $PSScriptRoot 'register-autoupdate-task.ps1'
