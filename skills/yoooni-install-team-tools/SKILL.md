@@ -29,6 +29,16 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap-install.ps1
 - 只改更新周期（不重装）→ `scripts\register-autoupdate-task.ps1 -EveryHours <小时>`（内容稳定后建议从 1 改回 2~4）。
 - 定时任务是「会话外也保持最新」的兜底；「开 Claude Code 即刷新」由 SessionStart hook 负责，二者互补。
 
+### macOS / Linux（用 .sh，与上面 .ps1 一一对应）
+
+按操作系统选脚本：Windows 用 `.ps1` / `.cmd`，**macOS / Linux 用同名 `.sh`**（命令、状态文件 `~/.kai-toolbox/*`、Gitee 源完全一致）。
+
+- 全新机器一键引导：`bash scripts/bootstrap-install.sh`（克隆+装本体 + 委托 install-team-tools.sh + 注册定时任务）。macOS 也可双击 `scripts/team-tools-install.command`（首次需 `chmod +x` 或右键→打开）。
+- 已装本体、只补装关联工具：`bash skills/yoooni-install-team-tools/install-team-tools.sh`。
+- 卸载：`bash scripts/uninstall-team-tools.sh`（或双击 `team-tools-uninstall.command`）。
+- 定时任务：macOS 用 **launchd**（`bash scripts/register-autoupdate-task.sh --every-hours 4`，写 `~/Library/LaunchAgents/com.yoooni.team-tools-autoupdate.plist`）；Linux 无 launchd，请用 cron 调 `~/.kai-toolbox/run-update.sh`。SessionStart hook 在 macOS/Linux 下自动跑 `.sh`，与 Windows 对等。
+- 参数风格：`.sh` 用 `-w <workspaceDir>` / `-s user|local|project` / `--every-hours N`（对应 .ps1 的 `-WorkspaceDir` / `-Scope` / `-EveryHours`）。
+
 ## AI 触发本 skill 时的判断逻辑
 
 1. 用户说"安装/装一下" → 跑安装脚本（脚本内部对每一项已做"已存在则跳过"判断，重复运行安全）。

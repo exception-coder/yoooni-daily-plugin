@@ -2,16 +2,17 @@
 ================================================
 
 【前提】先装好这三样（缺啥安装脚本会列出来并给链接）：
-  - Git（必需）        https://git-scm.com/download/win
-  - Node.js（>=18）    https://nodejs.org/zh-cn
+  - Git（必需）        Win: https://git-scm.com/download/win   mac: brew install git
+  - Node.js（>=18）    https://nodejs.org/zh-cn                 mac: brew install node
   - Claude Code CLI    装好 Node 后：npm install -g @anthropic-ai/claude-code
 
-【安装】双击  team-tools-install.cmd
-【卸载】双击  team-tools-uninstall.cmd
+【安装】Windows 双击 team-tools-install.cmd ；macOS 双击 team-tools-install.command
+【卸载】Windows 双击 team-tools-uninstall.cmd ；macOS 双击 team-tools-uninstall.command
 
 【说明】
   1. 首次安装，git 会弹窗让你登录 Gitee（公司私有仓），输一次账号即可，之后自动记住。
-  2. 安装会自动：装公司插件 + 知识库 MCP + 配置每 1 小时同步最新规范。
+  2. 安装会自动：装公司插件 + 知识库 MCP + 配置定时同步最新规范（Win 计划任务 / mac launchd）。
   3. 装完 / 卸载完，请【重启 Claude Code 会话】生效。
-  4. .cmd 必须和同名 .ps1 放在同一文件夹（本压缩包已放好，别拆开）。
+  4. Windows：.cmd 与同名 .ps1 放同一文件夹；macOS：.command 与 .sh 放同一文件夹（别拆开）。
+     macOS 首次双击若提示「身份不明的开发者」：右键→打开，或终端 chmod +x *.command *.sh。
   5. 卸载只摘公司这套（插件 / MCP / 定时任务），不动你别的插件，也默认保留已下载的源码。

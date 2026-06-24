@@ -22,6 +22,11 @@ description: 更新/同步公司团队套件（插件 + MCP），以及开启/�
 powershell -ExecutionPolicy Bypass -File "<plugin>\scripts\update-team-tools.ps1"
 ```
 
+> **macOS / Linux**：用同名 `.sh`（逻辑、状态文件 `~/.kai-toolbox/*`、Gitee 源完全一致）：
+> ```bash
+> bash "<plugin>/scripts/update-team-tools.sh"
+> ```
+
 它会两段都跑完：
 1. **MCP**：pull 两个 MCP 仓 → 引擎有变化才 `npm install/build` → 幂等重注册 `domain-knowledge` / `cross-topology`。
 2. **插件**：`claude plugin marketplace update` 刷源 → 对 `team-standards` / `project-coding-profiles` / `yoooni-daily-plugin` 逐个 `claude plugin update <p>@<p>`（幂等）。有更新就写 notice「已更新到 vX，重启会话生效」。
@@ -37,16 +42,24 @@ powershell -ExecutionPolicy Bypass -File "<plugin>\scripts\update-team-tools.ps1
 > ```
 > 注意：插件名必须带 `@marketplace` 全限定（裸名会报 `not found`）；更新后**重启会话**才加载新版。
 
-## B. 开启"会话外也定时刷新"（Windows 计划任务）
+## B. 开启"会话外也定时刷新"（计划任务）
 
 每 4 小时自动刷新全套（即使没开 Claude Code），用户级任务、无需管理员：
 
+**Windows（计划任务 schtasks）**
 ```powershell
 powershell -ExecutionPolicy Bypass -File "<plugin>\scripts\register-autoupdate-task.ps1"
 ```
-
 - 查看：`Get-ScheduledTask -TaskName YoooniTeamToolsAutoUpdate`
 - 卸载：`Unregister-ScheduledTask -TaskName YoooniTeamToolsAutoUpdate -Confirm:$false`
+
+**macOS（launchd）**
+```bash
+bash "<plugin>/scripts/register-autoupdate-task.sh" --every-hours 4
+```
+- 查看：`launchctl list | grep com.yoooni.team-tools-autoupdate`
+- 卸载：`launchctl unload ~/Library/LaunchAgents/com.yoooni.team-tools-autoupdate.plist && rm ~/Library/LaunchAgents/com.yoooni.team-tools-autoupdate.plist`
+- **Linux**：无 launchd，请用 cron：`crontab -e` 加 `0 */4 * * * ~/.kai-toolbox/run-update.sh`
 
 > **稳定启动器（防自更新断链）**：计划任务**不直接**指向版本化的 `update-team-tools.ps1`，而是指向固定路径的启动器 `%USERPROFILE%\.kai-toolbox\run-update.ps1`；启动器运行时再定位缓存里**最新版本**的脚本来跑。
 > 原因：`claude plugin` 缓存目录带版本号，本插件**自更新**后旧版本目录会被回收——若任务写死旧路径就会断掉。

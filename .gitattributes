@@ -1,0 +1,7 @@
+# macOS/Linux shell 脚本必须 LF（CRLF 会导致 bash 报 `\r` 错），强制行尾
+*.sh        text eol=lf
+*.command   text eol=lf
+# Windows 脚本保持 CRLF
+*.ps1       text eol=crlf
+*.cmd       text eol=crlf
+*.vbs       text eol=crlf
