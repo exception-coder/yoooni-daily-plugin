@@ -208,17 +208,17 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 
 详见 [skills/yoooni-taskspace/SKILL.md](skills/yoooni-taskspace/SKILL.md)
 
-### yoooni-hook-report — hook 命中周报
+### yoooni-hook-report — 团队 vibecoding 周报
 
 **触发短语**：
-- "hook 命中周报" / "hook 命中统计" / "规则命中排行"
-- "大家踩了哪些规范" / "哪条规则该升 block" / "warn 统计" / "看看 vibecoding 日志"
+- "hook 命中周报" / "规则命中排行" / "哪条规则该升 block" / "warn 统计"
+- "疑问纠正周报" / "大家常问什么业务" / "该补什么知识/规范" / "看看 vibecoding 日志"
 
-**核心功能**（用数据决定 warn 规则要不要升 block）：
-- 读公司共享 `\\IT01\版本更新\vibecoding` 下各人上报的 `hook-events-<用户>-<机器>.jsonl`，用 `hook-report.mjs` 聚合
-- 输出五张表：规则命中 Top、谁命中最多、warn vs block、按 hook、按插件
-- 数据闭环：warn hook（team-standards / project-coding-profiles）命中 → 本地 `~/.kai-toolbox/hook-events.jsonl` → `update-team-tools.ps1` best-effort 同步到共享（每人一文件）→ 本 skill 聚合
-- 只读不写；需能访问 `\\IT01`（访问不了先跑 `yoooni-smb-share-access` 修 SMB）
+**核心功能**（两部分，默认都出）：
+- **① hook 命中统计**：`hook-report.mjs` 聚合 `hook-events-*.jsonl` → 五张表（规则命中 Top / 谁命中最多 / warn vs block / 按 hook / 按插件），用数据决定 warn 规则要不要升 block。
+- **② 疑问/纠正规整**：`prompt-signal-report.mjs` 把 `prompt-signals-*.jsonl` 去噪去重、按 priority 排好（备料）→ **由 LLM 归纳**成"业务缺口 → 该补什么（domain-knowledge 知识库 / glossary 术语 / team-standards 规范 / 提示词）"。产出是候选，需人点头。
+- 数据闭环：hook 命中 / prompt 信号 → 本地 `~/.kai-toolbox/*.jsonl` → `update-team-tools.ps1` best-effort 同步到共享（每人一文件）→ 本 skill 聚合 + 规整。
+- 只读不写；需能访问 `\\IT01`（访问不了先跑 `yoooni-smb-share-access` 修 SMB）。
 
 详见 [skills/yoooni-hook-report/SKILL.md](skills/yoooni-hook-report/SKILL.md)
 
@@ -254,9 +254,10 @@ yoooni-daily-plugin/
 │   ├── yoooni-taskspace/         # 跨目录任务空间 skill（junction/symlink 聚合项目）
 │   │   ├── SKILL.md
 │   │   └── taskspace.mjs        # 创建/查看/追加/移除/拆除任务空间
-│   └── yoooni-hook-report/       # hook 命中周报 skill（聚合 \\IT01 共享事件）
+│   └── yoooni-hook-report/       # 团队 vibecoding 周报 skill（聚合 \\IT01 共享事件）
 │       ├── SKILL.md
-│       └── hook-report.mjs      # 读 hook-events-*.jsonl 出规则命中/warn-block 统计
+│       ├── hook-report.mjs          # ① 读 hook-events-*.jsonl 出规则命中/warn-block 统计
+│       └── prompt-signal-report.mjs # ② 读 prompt-signals-*.jsonl 去噪去重排序，备料给 LLM 规整
 ├── hooks/
 │   ├── hooks.json               # SessionStart 自动更新 hook 声明
 │   └── session-autoupdate.js    # 每日后台刷新 MCP 仓 + 浮现插件新版提示

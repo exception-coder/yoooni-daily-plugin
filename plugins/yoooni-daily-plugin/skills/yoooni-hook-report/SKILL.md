@@ -1,9 +1,14 @@
 ---
 name: yoooni-hook-report
-description: 出一份「hook 命中周报」——统计团队 warn 档 hook 的命中情况，用数据决定某条规则要不要从 warn 升 block、看大家最常踩哪条规范。当用户说"hook 命中周报"、"hook 命中统计"、"规则命中排行"、"大家踩了哪些规范"、"哪条规则该升 block"、"warn 统计"、"看看 vibecoding 日志"时触发。数据来自公司共享 \\IT01\版本更新\vibecoding 下各人上报的 hook-events-*.jsonl（由 team-standards / project-coding-profiles 的 warn hook 本地登记、update-team-tools.ps1 best-effort 同步）。需能访问 \\IT01 共享。
+description: 出一份「团队 vibecoding 周报」——两部分：①hook 命中统计(用数据决定某条 warn 规则要不要升 block、谁常踩)；②对 AI 的疑问/纠正规整(把同事反复问的业务、反复纠正 AI 的点，LLM 归纳成"业务缺口 → 该补什么知识库/术语/规范/提示词")。当用户说"hook 命中周报"、"规则命中排行"、"哪条规则该升 block"、"warn 统计"、"疑问纠正周报"、"大家常问什么业务"、"该补什么知识/规范"、"prompt 信号统计"、"看看 vibecoding 日志"时触发。数据来自公司共享 \\IT01\版本更新\vibecoding（hook-events-*.jsonl + prompt-signals-*.jsonl，由 team-standards / project-coding-profiles 的 hook 本地登记、update-team-tools.ps1 best-effort 同步）。需能访问 \\IT01 共享。
 ---
 
-# hook 命中周报
+# 团队 vibecoding 周报
+
+两部分：**① hook 命中统计**（规则该不该升 block）+ **② 疑问/纠正规整**（业务缺口 → 该补什么）。
+默认两部分都出；用户只问其一时只跑对应那部分。
+
+## ① hook 命中统计
 
 把团队各人的 hook 命中事件聚合成统计，回答两个问题：
 
@@ -36,6 +41,32 @@ node hook-report.mjs "D:\some\dir"     # 换共享/本地目录（排查用）
 ```
 
 输出五张表：**规则命中 Top**、**谁命中最多**、**warn vs block**、**按 hook**、**按插件**。
+
+## ② 疑问/纠正规整（业务缺口 → 该补什么）
+
+把同事**对 AI 的疑问/纠正**（反复问的业务、反复纠偏的点）归纳成"该补什么"。数据来自 `prompt-signals-*.jsonl`（`prompt-signal-capture` hook 已在采集层降噪/去重/标 priority）。
+
+**第 1 步：备料（机械）** —— 跑脚本拿去噪去重后、按 priority 排好的高价值条目：
+```powershell
+node "<plugin>\skills\yoooni-hook-report\prompt-signal-report.mjs"            # 最近 7 天
+node prompt-signal-report.mjs --days=30 --top=80     # 调范围/条数
+node prompt-signal-report.mjs --json                 # 给程序用
+```
+它输出：按类型/优先级/项目的计数 + 高价值条目列表（`priority|kind|afterEdit (项目/人/日期) 原文摘要`）。`priority` 序：`high+`(纠正且紧跟编辑) > `high`(纠正) > `medium`(疑问) > `low`(任务/其它)。
+
+**第 2 步：规整（LLM，本 skill 的核心）** —— 读上面输出，**你（AI）**做归纳，**不要**只复述原文：
+1. **聚类**：把指向同一主题的条目合并（如多条都在问"配送/收胚取哪个字段" → 一簇）。
+2. 每簇产出一行：
+   | 业务领域/主题 | 类型(疑问/纠正) | 命中频次·涉及人 | 推断的缺口 | 建议补到哪 |
+   - **建议补到哪**按缺口性质分流：
+     - 业务字段/口径/流程不清 → **domain-knowledge 知识库** 或 **glossary 术语表**（`_candidates.md`）
+     - 反复纠正同类编码写法 → **team-standards 通用规范/skill**（够客观可加 hook）
+     - 项目专属约定 → **project-coding-profiles** 对应项目画像
+     - AI 老理解错某类意图 → 优化相关 **skill 的 description/提示词**
+3. **排序**：先列 `high+`/`high`（纠正，最该立即处理）、再 `medium`（疑问，知识盲区）。
+4. **红线**：产出的是**候选**，不是规——"要不要真补、补成什么"由人点头（与 hook 命中→升 block 一致）。
+
+> 为什么规整放这里、不放 hook：采集层(正则)读不懂"这是什么业务问题"，只能去明显噪声；**精准提取业务缺口是语义活，必须 LLM 过一遍**——这一步就是那道 LLM 规整。
 
 ## 前提与边界
 
