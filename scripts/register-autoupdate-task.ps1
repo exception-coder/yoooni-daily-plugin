@@ -19,25 +19,36 @@ $state = Join-Path $env:USERPROFILE '.kai-toolbox'
 New-Item -ItemType Directory -Force -Path $state | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $launcher = Join-Path $state 'run-update.ps1'
+$vbs      = Join-Path $state 'run-hidden.vbs'
 
-# 部署/刷新稳定启动器到固定路径 + 记下源脚本作回退（都很廉价，每次都做以保持最新）
+# 部署/刷新稳定启动器 + VBS 隐藏启动器到固定路径 + 记下源脚本作回退（都很廉价，每次都做以保持最新）
 $srcLauncher = Join-Path $PSScriptRoot 'run-update.ps1'
+$srcVbs      = Join-Path $PSScriptRoot 'run-hidden.vbs'
 if (Test-Path $srcLauncher) { Copy-Item $srcLauncher $launcher -Force }
+if (Test-Path $srcVbs)      { Copy-Item $srcVbs $vbs -Force }
 [IO.File]::WriteAllText((Join-Path $state 'update-script.path'), (Join-Path $PSScriptRoot 'update-team-tools.ps1'), $utf8)
 
-# 任务已正确指向启动器则不重建(避免每次刷新打乱触发时间)；否则(新建/旧任务写死版本路径)创建/迁移
-$pointsAtLauncher = $false
+# 任务动作：经 VBS 以隐藏窗口(SW_HIDE)跑 powershell——子进程(git/npm/claude/node)继承隐藏控制台、不再闪黑框。
+# （-WindowStyle Hidden 是"先开窗再藏"，挡不住那一瞬；故改用 wscript + WshShell.Run(...,0)。）
+# VBS 无参时自动定位同目录 run-update.ps1，故 TR 只是单个带引号路径，避开 schtasks 嵌套引号。
+$tr = "wscript.exe `"$vbs`""
+$expectInterval = "PT{0}H" -f $EveryHours
+
+# 仅当任务已正确(走 VBS 且间隔==EveryHours)才跳过重建，避免打乱触发时间；
+# 否则创建/迁移——旧任务多为 powershell 直跑 + 误成每小时，会在此被纠正为 wscript 隐藏 + 4 小时。
+$correct = $false
 if ($existing) {
-  $actArgs = (($existing.Actions | ForEach-Object { $_.Arguments }) -join ' ')
-  if ($actArgs -match [regex]::Escape($launcher)) { $pointsAtLauncher = $true }
+  $actArgs = (($existing.Actions | ForEach-Object { ($_.Execute + ' ' + $_.Arguments) }) -join ' ')
+  $usesVbs = ($actArgs -match 'wscript') -and ($actArgs -match [regex]::Escape($vbs))
+  $intv = (($existing.Triggers | ForEach-Object { $_.Repetition.Interval }) -join ',')
+  if ($usesVbs -and ($intv -match [regex]::Escape($expectInterval))) { $correct = $true }
 }
-if ($pointsAtLauncher) {
-  Write-Host "Task '$taskName' already points at stable launcher; launcher refreshed." -ForegroundColor DarkGray
+if ($correct) {
+  Write-Host "Task '$taskName' already correct (VBS hidden launcher, every $EveryHours h); launcher refreshed." -ForegroundColor DarkGray
 } else {
-  $tr = "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcher`""
   schtasks /Create /TN $taskName /TR $tr /SC HOURLY /MO $EveryHours /F | Out-Null
   if ($LASTEXITCODE -eq 0) {
-    Write-Host "Registered '$taskName' (every $EveryHours h) -> stable launcher: $launcher" -ForegroundColor Green
+    Write-Host "Registered '$taskName' (every $EveryHours h, hidden via VBS) -> $launcher" -ForegroundColor Green
   } else {
     Write-Warning "schtasks create failed (exit $LASTEXITCODE). Run this script in your own terminal."
   }

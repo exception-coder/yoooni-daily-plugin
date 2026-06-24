@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// SessionStart hook：每天最多一次，在后台拉取+重建公司 MCP 仓(不阻塞会话)；
-// 并把"团队插件有新版"提示带进会话上下文(插件更新是 slash，只能提示你点一下)。
+// SessionStart hook：每天最多一次，在后台刷新公司套件(不阻塞会话)——经 run-hidden.vbs
+// 以隐藏窗口启动，避免黑框闪烁(见 scripts/run-hidden.vbs)；并把上轮"插件已更新"提示带进上下文。
 // 关闭：环境变量 YOOONI_AUTOUPDATE=off ；立即触发一次：YOOONI_AUTOUPDATE=now
 const fs = require('fs');
 const path = require('path');
@@ -33,12 +33,14 @@ function run() {
     if (due && process.platform === 'win32') {
       try { fs.writeFileSync(stamp, String(Date.now())); } catch (e) {}
       const ps1 = path.join(__dirname, '..', 'scripts', 'update-team-tools.ps1');
+      const vbs = path.join(__dirname, '..', 'scripts', 'run-hidden.vbs');
       try {
-        const child = spawn('powershell',
-          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', ps1],
+        // 经 VBS 以隐藏窗口(SW_HIDE)启动：powershell 及其子进程(git/npm/claude)全程无窗口、不闪黑框
+        // （-WindowStyle Hidden 是"先开窗再藏"，挡不住那一瞬，故弃用）。
+        const child = spawn('wscript.exe', [vbs, ps1],
           { detached: true, stdio: 'ignore', windowsHide: true });
         child.unref();
-        out += '公司团队套件正在后台刷新(每日一次：MCP 仓 git pull + 必要时重建)。';
+        out += '公司团队套件正在后台刷新(每日一次：MCP 仓 git pull + 插件 update)。';
       } catch (e) {}
     }
   } catch (e) {}

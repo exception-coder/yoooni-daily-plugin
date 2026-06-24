@@ -163,7 +163,8 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 **核心功能**（装一个插件 → AI 全自动维护全套）：
 - **MCP 层全自动**：`SessionStart` hook（`hooks/session-autoupdate.js`）每开 Claude Code、每天最多一次在**后台**（不阻塞会话）`git pull` 两个 MCP 仓（project-domain-knowledge 引擎 / cross-project-topology 知识）→ 引擎有变化才重建 → 幂等重注册。仓库目录自动定位（能从 `claude mcp get` 解析真实路径，解决默认 C 盘找不到 D 盘仓库的问题）。
 - **插件层全自动**：同一脚本走 `claude plugin marketplace update` 刷源 → `claude plugin update <plugin>@<marketplace>` 逐个更新（team-standards / project-coding-profiles / yoooni-daily-plugin，幂等，已最新则空跑）。**更新后重启会话生效**，notice 会提示。（`claude plugin` 现为完整 CLI，"插件只能走 slash"的旧限制已废弃；插件名须带 `@marketplace` 全限定。）
-- **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、每 4 小时），Claude Code 没开也保持 MCP + 插件最新。任务指向**固定路径的稳定启动器** `%USERPROFILE%\.kai-toolbox\run-update.ps1`（运行时再定位最新版脚本），避免本插件自更新后版本化缓存路径失效导致任务断链；`update-team-tools.ps1` 每次跑完会**自愈校准**任务（仅当任务已存在）。
+- **会话外定时**：`scripts/register-autoupdate-task.ps1` 注册 Windows 计划任务（用 schtasks、用户级、**每 4 小时**），Claude Code 没开也保持 MCP + 插件最新。任务指向**固定路径的稳定启动器** `%USERPROFILE%\.kai-toolbox\run-update.ps1`（运行时再定位最新版脚本），避免本插件自更新后版本化缓存路径失效导致任务断链；`update-team-tools.ps1` 每次跑完会**自愈校准**任务（仅当任务已存在，并纠正间隔/动作）。
+- **无黑框闪烁**：计划任务与 SessionStart 都经 `scripts/run-hidden.vbs`（`WshShell.Run(cmd,0,False)`，创建即 SW_HIDE）启动后台 powershell——powershell 及其子进程（git/npm/claude/node）**全程无窗口**。`-WindowStyle Hidden` 是"先开窗再藏窗"，挡不住那一瞬的闪烁，故弃用。
 - **hook 命中日志上报**：同一脚本顺手把本地 `~/.kai-toolbox/hook-events.jsonl`（team-standards / project-coding-profiles 的 warn hook 命中时写入）best-effort 同步到 `\\IT01\版本更新\vibecoding\hook-events-<用户>-<机器>.jsonl`（每人一文件，连不上就跳过）。用 `yoooni-hook-report` skill 聚合出周报。
 - 开关：环境变量 `YOOONI_AUTOUPDATE=off` 关闭、`=now` 立即刷一次。日志在 `%USERPROFILE%\.kai-toolbox\team-tools-update.log`。
 
@@ -262,7 +263,8 @@ yoooni-daily-plugin/
 ├── scripts/
 │   ├── update-team-tools.ps1    # 同步脚本：pull 2 个 MCP 仓 + 必要时重建/重注册 + claude plugin update 自动更新插件 + 自愈计划任务
 │   ├── run-update.ps1           # 稳定启动器：计划任务固定指向它，运行时定位最新版 update 脚本（防版本化路径失效）
-│   └── register-autoupdate-task.ps1 # 注册 Windows 计划任务（schtasks，每 4 小时，指向稳定启动器）
+│   ├── run-hidden.vbs           # 隐藏窗口启动器：WshShell.Run(...,0) 真隐藏，避免黑框闪烁（-WindowStyle Hidden 做不到）
+│   └── register-autoupdate-task.ps1 # 注册 Windows 计划任务（schtasks，每 4 小时，经 run-hidden.vbs 隐藏启动）
 ├── .gitignore
 ├── CLAUDE.md                # 维护指引
 └── README.md
