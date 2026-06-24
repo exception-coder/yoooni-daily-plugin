@@ -139,6 +139,39 @@ if (($env:YOOONI_PROMPT_SIGNAL_UPLOAD).ToLower() -ne 'off') {
   Log "  promptsignal: YOOONI_PROMPT_SIGNAL_UPLOAD=off，仅留本地不上行"
 }
 
+# --- best-effort 同步「知识图谱 + 术语表」到公司共享(每人一文件夹)；只上行可复用知识资产 ---
+# 源：{用户文档}\ai-docs\<project>\{knowledge-graph\, glossary\, *glossary*.md}
+#  → \\IT01\版本更新\vibecoding\<用户>-<机器>\ai-docs\<project>\...（robocopy /MIR 镜像，含删除）
+# 本地永远是源(只 local→共享)；连不上/无源就跳过。off 热路径(随更新周期跑)。
+# YOOONI_KG_UPLOAD=off 关闭上行(仅本地沉淀)。work-log / bug 等个人内容不上行。
+if (($env:YOOONI_KG_UPLOAD).ToLower() -ne 'off') {
+  try {
+    $aiDocsRoot = Join-Path $env:USERPROFILE 'Documents\ai-docs'
+    $kgShareRoot = '\\IT01\版本更新\vibecoding\{0}-{1}\ai-docs' -f $env:USERNAME, $env:COMPUTERNAME
+    if ((Test-Path $aiDocsRoot) -and (Test-Path '\\IT01\版本更新\vibecoding')) {
+      foreach ($proj in @(Get-ChildItem -Path $aiDocsRoot -Directory -ErrorAction SilentlyContinue)) {
+        $projDst = Join-Path $kgShareRoot $proj.Name
+        foreach ($sub in @('knowledge-graph', 'glossary')) {
+          $src = Join-Path $proj.FullName $sub
+          if (Test-Path $src) {
+            robocopy "$src" (Join-Path $projDst $sub) /MIR /NJH /NJS /NFL /NDL /NP /R:1 /W:1 2>&1 | Out-Null
+            if ($LASTEXITCODE -lt 8) { Log ("  kg synced -> " + (Join-Path $projDst $sub)) }
+            else { Log ("  kg robocopy exit $LASTEXITCODE : " + $src) }
+            $global:LASTEXITCODE = 0
+          }
+        }
+        foreach ($gf in @(Get-ChildItem -Path $proj.FullName -Filter '*glossary*' -File -ErrorAction SilentlyContinue)) {
+          New-Item -ItemType Directory -Force -Path $projDst | Out-Null
+          Copy-Item $gf.FullName (Join-Path $projDst $gf.Name) -Force
+          Log ("  kg glossary synced -> " + (Join-Path $projDst $gf.Name))
+        }
+      }
+    } else { Log "  kg: ai-docs 或共享 \\IT01\版本更新\vibecoding 不可达，跳过同步" }
+  } catch { Log ("  kg sync skipped: " + $_.Exception.Message) }
+} else {
+  Log "  kg: YOOONI_KG_UPLOAD=off，知识图谱仅留本地不上行"
+}
+
 # --- 自愈：若计划任务已存在，确保它指向稳定启动器(防插件自更新后版本化路径失效) ---
 # 仅校准已存在的任务，绝不擅自创建。本步在计划任务/SessionStart 两条触发路径下都会跑到。
 $reg = Join-Path $PSScriptRoot 'register-autoupdate-task.ps1'
