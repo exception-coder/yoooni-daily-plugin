@@ -14,17 +14,20 @@ It also ships a **SessionStart hook** (`hooks/hooks.json` + `hooks/session-autou
 
 ## Plugin manifest layout
 
-- [.claude-plugin/plugin.json](.claude-plugin/plugin.json) — Claude 可安装插件清单。
-- [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json) — Claude marketplace 入口（指向本仓）。
-- [.codex-plugin/plugin.json](.codex-plugin/plugin.json) — Codex 插件清单（含 `interface` 富描述）。
-- [.agents/plugins/marketplace.json](.agents/plugins/marketplace.json) — Codex marketplace 清单（OpenAI 格式，缺它 codex `plugin add` 会 `plugin not found`）。`.agents` 清单**不带 version**，无需随版本改。
+> 子目录布局（与 team-standards 一致）：仓库根只放两份 **marketplace** 清单，**插件本体**在 `plugins/yoooni-daily-plugin/`。codex 要求插件在子目录、不认根布局 `source:"./"`。
 
-**Version bumping requires editing 3 files** — `.claude-plugin/plugin.json`、`.claude-plugin/marketplace.json`、`.codex-plugin/plugin.json` 的 `version` 必须 lockstep（`description` 也尽量同步）。Self-check:
+- [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json) — Claude marketplace 入口（`source` 指向 `./plugins/yoooni-daily-plugin`）。
+- [.agents/plugins/marketplace.json](.agents/plugins/marketplace.json) — Codex marketplace 清单（OpenAI 格式，`source.path` 同指子目录；缺它/或用根布局 codex `plugin add` 会 `plugin not found`）。`.agents` 清单**不带 version**，无需随版本改。
+- `plugins/yoooni-daily-plugin/.claude-plugin/plugin.json` — Claude 可安装插件清单。
+- `plugins/yoooni-daily-plugin/.codex-plugin/plugin.json` — Codex 插件清单（含 `interface` 富描述）。
+- 插件内容（skills / hooks / scripts）均在 `plugins/yoooni-daily-plugin/` 下。
+
+**Version bumping requires editing 3 files** — `plugins/yoooni-daily-plugin/.claude-plugin/plugin.json`、`.claude-plugin/marketplace.json`、`plugins/yoooni-daily-plugin/.codex-plugin/plugin.json` 的 `version` 必须 lockstep（`description` 也尽量同步）。Self-check:
 
 ```powershell
-$v1 = (Get-Content .claude-plugin\plugin.json | ConvertFrom-Json).version
+$v1 = (Get-Content plugins\yoooni-daily-plugin\.claude-plugin\plugin.json | ConvertFrom-Json).version
 $v2 = (Get-Content .claude-plugin\marketplace.json | ConvertFrom-Json).plugins[0].version
-$v3 = (Get-Content .codex-plugin\plugin.json | ConvertFrom-Json).version
+$v3 = (Get-Content plugins\yoooni-daily-plugin\.codex-plugin\plugin.json | ConvertFrom-Json).version
 if (($v1 -ne $v2) -or ($v1 -ne $v3)) { Write-Error "version mismatch: claude plugin=$v1 marketplace=$v2 codex=$v3" }
 ```
 

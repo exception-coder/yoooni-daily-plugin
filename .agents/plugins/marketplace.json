@@ -8,7 +8,7 @@
       "name": "yoooni-daily-plugin",
       "source": {
         "source": "local",
-        "path": "./"
+        "path": "./plugins/yoooni-daily-plugin"
       },
       "category": "Productivity"
     }
