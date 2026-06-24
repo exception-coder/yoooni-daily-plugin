@@ -14,15 +14,18 @@ It also ships a **SessionStart hook** (`hooks/hooks.json` + `hooks/session-autou
 
 ## Plugin manifest layout
 
-- [.claude-plugin/plugin.json](.claude-plugin/plugin.json) — installable plugin manifest.
-- [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json) — marketplace entry pointing at this repo.
+- [.claude-plugin/plugin.json](.claude-plugin/plugin.json) — Claude 可安装插件清单。
+- [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json) — Claude marketplace 入口（指向本仓）。
+- [.codex-plugin/plugin.json](.codex-plugin/plugin.json) — Codex 插件清单（含 `interface` 富描述）。
+- [.agents/plugins/marketplace.json](.agents/plugins/marketplace.json) — Codex marketplace 清单（OpenAI 格式，缺它 codex `plugin add` 会 `plugin not found`）。`.agents` 清单**不带 version**，无需随版本改。
 
-**Version bumping requires editing BOTH files** — `version` and `description` must stay in lockstep. Self-check:
+**Version bumping requires editing 3 files** — `.claude-plugin/plugin.json`、`.claude-plugin/marketplace.json`、`.codex-plugin/plugin.json` 的 `version` 必须 lockstep（`description` 也尽量同步）。Self-check:
 
 ```powershell
 $v1 = (Get-Content .claude-plugin\plugin.json | ConvertFrom-Json).version
 $v2 = (Get-Content .claude-plugin\marketplace.json | ConvertFrom-Json).plugins[0].version
-if ($v1 -ne $v2) { Write-Error "version mismatch: plugin.json=$v1 marketplace.json=$v2" }
+$v3 = (Get-Content .codex-plugin\plugin.json | ConvertFrom-Json).version
+if (($v1 -ne $v2) -or ($v1 -ne $v3)) { Write-Error "version mismatch: claude plugin=$v1 marketplace=$v2 codex=$v3" }
 ```
 
 > ⚠️ **JSON 必须是无 BOM 的 UTF-8**。PowerShell 5.1 的 `Set-Content -Encoding UTF8` / `Out-File -Encoding UTF8` 会写入 **BOM**，导致 `/plugin marketplace add` 报 `Invalid JSON ... Unrecognized token`。改 json 用无 BOM 方式：

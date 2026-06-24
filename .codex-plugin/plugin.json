@@ -1,0 +1,51 @@
+{
+  "name": "yoooni-daily-plugin",
+  "version": "0.15.0",
+  "description": "Yoooni daily-work toolbox: onboarding, SMB share fix, IDEA/Resin setup, daily startup, one-click install & fully-automatic update of the company plugins + MCP, production-log troubleshooting, cross-directory task spaces, and a hook-hit weekly report. Includes a SessionStart auto-update hook.",
+  "author": {
+    "name": "Zhang Kai",
+    "email": "ping.yang@kpay-group.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "yoooni",
+    "svn",
+    "onboard",
+    "smb",
+    "network-share",
+    "idea",
+    "resin",
+    "redis",
+    "startup",
+    "daily-tools",
+    "team-standards",
+    "mcp",
+    "gitee",
+    "install",
+    "prod-log",
+    "troubleshoot",
+    "taskspace",
+    "junction",
+    "symlink"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Yoooni Daily Plugin",
+    "shortDescription": "Yoooni 团队日常工具箱：入职、启动、安装/更新公司套件、生产排障、任务空间。",
+    "longDescription": "Yoooni 团队日常工作插件，9 个 Skill 覆盖：入职初始化（SVN 拉文档）、SMB 共享访问修复、IDEA/Resin 开发环境搭建、日常启动、一键安装与全自动更新公司插件+MCP、生产日志排障、跨目录任务空间、hook 命中周报；并内置 SessionStart 自动更新 hook（后台 git pull + claude plugin update + 同步命中日志）。Works across Claude Code and Codex.",
+    "developerName": "Zhang Kai",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "我是新同事，怎么开始？",
+      "安装公司团队工具。",
+      "启动 Yoooni 项目。",
+      "更新公司套件。"
+    ],
+    "brandColor": "#0EA5E9"
+  }
+}

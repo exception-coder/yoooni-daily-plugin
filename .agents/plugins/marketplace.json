@@ -1,0 +1,16 @@
+{
+  "name": "yoooni-daily-plugin",
+  "interface": {
+    "displayName": "Yoooni Daily Plugin"
+  },
+  "plugins": [
+    {
+      "name": "yoooni-daily-plugin",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
