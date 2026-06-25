@@ -27,9 +27,15 @@ $ExpectedPlugins = @(
     'team-standards@team-standards',
     'project-coding-profiles@project-coding-profiles'
 )
+$ExpectedPluginNames = @('team-standards', 'project-coding-profiles', 'yoooni-daily-plugin')
 $ExpectedMcpServers = @('domain-knowledge', 'cross-topology')
 $AutoUpdateTaskName = 'YoooniTeamToolsAutoUpdate'
 $InstalledPluginsFile = Join-Path $env:USERPROFILE '.claude\plugins\installed_plugins.json'
+$CodexConfigFile = Join-Path $env:USERPROFILE '.codex\config.toml'
+$CursorConfigFile = Join-Path $env:USERPROFILE '.cursor\mcp.json'
+$CursorRulesDir = Join-Path $env:USERPROFILE '.cursor\rules'
+$KiroConfigFile = Join-Path $env:USERPROFILE '.kiro\settings\mcp.json'
+$KiroSteeringFile = Join-Path $env:USERPROFILE '.kiro\steering\yoooni-team-tools.md'
 $WorkspaceConfigFile = Join-Path $env:USERPROFILE '.kai-toolbox\workspace.path'
 
 function Write-Header($Text) {
@@ -273,6 +279,360 @@ function Get-McpCliMap {
     return $map
 }
 
+function Get-CodexExpectedMcpSpecs($ResolvedWorkspaceDir) {
+    $mcpDir = Join-Path $ResolvedWorkspaceDir 'project-domain-knowledge'
+    $topoDir = Join-Path $ResolvedWorkspaceDir 'cross-project-topology'
+    $entry = (Join-Path $mcpDir 'dist\server.js') -replace '\\', '/'
+    $domainKb = (Join-Path $mcpDir 'knowledge') -replace '\\', '/'
+    $topoKb = (Join-Path $topoDir 'knowledge') -replace '\\', '/'
+
+    $specs = [ordered]@{
+        'domain-knowledge' = [pscustomobject]@{ Entry = $entry; Kb = $domainKb }
+    }
+    if (Test-Path -LiteralPath ($topoKb -replace '/', '\')) {
+        $specs['cross-topology'] = [pscustomobject]@{ Entry = $entry; Kb = $topoKb }
+    }
+    return $specs
+}
+
+function Get-CodexMcpBlock($ConfigText, $ServerName) {
+    $escaped = [regex]::Escape($ServerName)
+    $pattern = '(?ms)^\[mcp_servers\.(?:"' + $escaped + '"|' + $escaped + ')\]\s*\r?\n.*?(?=^\[|\z)'
+    $match = [regex]::Match($ConfigText, $pattern)
+    if ($match.Success) { return $match.Value }
+    return $null
+}
+
+function Get-CodexMcpRows($ResolvedWorkspaceDir) {
+    $codexRoot = Join-Path $env:USERPROFILE '.codex'
+    if (-not (Test-Path -LiteralPath $codexRoot)) {
+        return @([pscustomobject]@{
+            MCP = 'Codex'
+            Config = 'not installed'
+            Result = 'SKIP'
+            Action = 'Install Codex, then run team-tools-install.cmd'
+        })
+    }
+
+    if (-not (Test-Path -LiteralPath $CodexConfigFile)) {
+        return @([pscustomobject]@{
+            MCP = 'Codex'
+            Config = 'missing config.toml'
+            Result = 'FAIL'
+            Action = 'Run team-tools-install.cmd'
+        })
+    }
+
+    $configText = Get-Content -LiteralPath $CodexConfigFile -Raw -ErrorAction SilentlyContinue
+    if ($null -eq $configText) { $configText = '' }
+    $specs = Get-CodexExpectedMcpSpecs $ResolvedWorkspaceDir
+    $rows = foreach ($serverName in $specs.Keys) {
+        $spec = $specs[$serverName]
+        $block = Get-CodexMcpBlock $configText $serverName
+        if (-not $block) {
+            [pscustomobject]@{
+                MCP = $serverName
+                Config = 'missing'
+                Result = 'FAIL'
+                Action = 'Run team-tools-install.cmd'
+            }
+            continue
+        }
+
+        $hasNodeCommand = $block -match '(?m)^\s*command\s*=\s*"node"\s*$'
+        $hasEntry = $block -match [regex]::Escape($spec.Entry)
+        $hasKb = $block -match [regex]::Escape($spec.Kb)
+        if ($hasNodeCommand -and $hasEntry -and $hasKb) {
+            [pscustomobject]@{
+                MCP = $serverName
+                Config = 'current'
+                Result = 'OK'
+                Action = 'Ready'
+            }
+        }
+        else {
+            [pscustomobject]@{
+                MCP = $serverName
+                Config = 'stale'
+                Result = 'FAIL'
+                Action = 'Run update-team-tools.ps1'
+            }
+        }
+    }
+    return @($rows)
+}
+
+function Test-CodexMcpConfig($ResolvedWorkspaceDir) {
+    $rows = Get-CodexMcpRows $ResolvedWorkspaceDir
+    foreach ($row in $rows) {
+        if ($row.Result -eq 'OK') {
+            Write-Check 'OK' "Codex MCP configured: $($row.MCP)" $CodexConfigFile
+        }
+        elseif ($row.Result -eq 'SKIP') {
+            Write-Check 'WARN' 'Codex config skipped' $row.Action
+        }
+        else {
+            Write-Check 'FAIL' "Codex MCP not ready: $($row.MCP)" ("{0}; {1}" -f $row.Config, $row.Action)
+        }
+    }
+}
+
+function Get-JsonMcpRows($ToolName, $ToolRoot, $ConfigFile, $ResolvedWorkspaceDir) {
+    if (-not (Test-Path -LiteralPath $ToolRoot)) {
+        return @([pscustomobject]@{
+            Tool = $ToolName
+            MCP = $ToolName
+            Config = 'not installed'
+            Result = 'SKIP'
+            Action = "Install $ToolName, then run team-tools-install.cmd"
+        })
+    }
+
+    if (-not (Test-Path -LiteralPath $ConfigFile)) {
+        return @([pscustomobject]@{
+            Tool = $ToolName
+            MCP = $ToolName
+            Config = 'missing mcp config'
+            Result = 'FAIL'
+            Action = 'Run team-tools-install.cmd'
+        })
+    }
+
+    try {
+        $root = Get-Content -LiteralPath $ConfigFile -Raw -ErrorAction Stop | ConvertFrom-Json
+    }
+    catch {
+        return @([pscustomobject]@{
+            Tool = $ToolName
+            MCP = $ToolName
+            Config = 'invalid json'
+            Result = 'FAIL'
+            Action = 'Fix config JSON, then run update-team-tools.ps1'
+        })
+    }
+
+    $specs = Get-CodexExpectedMcpSpecs $ResolvedWorkspaceDir
+    $rows = foreach ($serverName in $specs.Keys) {
+        $spec = $specs[$serverName]
+        $server = if ($root.mcpServers) { $root.mcpServers.$serverName } else { $null }
+        if (-not $server) {
+            [pscustomobject]@{
+                Tool = $ToolName
+                MCP = $serverName
+                Config = 'missing'
+                Result = 'FAIL'
+                Action = 'Run team-tools-install.cmd'
+            }
+            continue
+        }
+
+        $args = @($server.args)
+        $hasNodeCommand = $server.command -eq 'node'
+        $hasEntry = $args -contains $spec.Entry
+        $hasKb = $server.env -and $server.env.DOMAIN_KB_DIR -eq $spec.Kb
+        if ($hasNodeCommand -and $hasEntry -and $hasKb) {
+            [pscustomobject]@{
+                Tool = $ToolName
+                MCP = $serverName
+                Config = 'current'
+                Result = 'OK'
+                Action = 'Ready'
+            }
+        }
+        else {
+            [pscustomobject]@{
+                Tool = $ToolName
+                MCP = $serverName
+                Config = 'stale'
+                Result = 'FAIL'
+                Action = 'Run update-team-tools.ps1'
+            }
+        }
+    }
+    return @($rows)
+}
+
+function Test-JsonMcpConfig($ToolName, $ToolRoot, $ConfigFile, $ResolvedWorkspaceDir) {
+    $rows = Get-JsonMcpRows $ToolName $ToolRoot $ConfigFile $ResolvedWorkspaceDir
+    foreach ($row in $rows) {
+        if ($row.Result -eq 'OK') {
+            Write-Check 'OK' "$ToolName MCP configured: $($row.MCP)" $ConfigFile
+        }
+        elseif ($row.Result -eq 'SKIP') {
+            Write-Check 'WARN' "$ToolName config skipped" $row.Action
+        }
+        else {
+            Write-Check 'FAIL' "$ToolName MCP not ready: $($row.MCP)" ("{0}; {1}" -f $row.Config, $row.Action)
+        }
+    }
+}
+
+function Get-CodexPluginRows($ResolvedWorkspaceDir) {
+    $codexRoot = Join-Path $env:USERPROFILE '.codex'
+    if (-not (Test-Path -LiteralPath $codexRoot)) {
+        return @([pscustomobject]@{
+            Plugin = 'Codex'
+            Config = 'not installed'
+            Cache = '-'
+            Result = 'SKIP'
+            Action = 'Install Codex, then run team-tools-install.cmd'
+        })
+    }
+
+    $configText = ''
+    if (Test-Path -LiteralPath $CodexConfigFile) {
+        $configText = Get-Content -LiteralPath $CodexConfigFile -Raw -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $configText) { $configText = '' }
+
+    $rows = foreach ($name in $ExpectedPluginNames) {
+        $pluginRef = "{0}@{0}" -f $name
+        $marketPattern = '(?ms)^\[marketplaces\.' + [regex]::Escape($name) + '\]\s*\r?\n.*?(?=^\[|\z)'
+        $pluginPattern = '(?ms)^\[plugins\."' + [regex]::Escape($pluginRef) + '"\]\s*\r?\n.*?enabled\s*=\s*true.*?(?=^\[|\z)'
+        $config = if ($configText -match $marketPattern -and $configText -match $pluginPattern) { 'enabled' } else { 'missing' }
+
+        $cacheRoot = Join-Path $codexRoot ("plugins\cache\{0}\{0}" -f $name)
+        $manifest = $null
+        if (Test-Path -LiteralPath $cacheRoot) {
+            $manifest = Get-ChildItem -Path $cacheRoot -Filter 'plugin.json' -Recurse -Force -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match '\\\.codex-plugin\\plugin\.json$' } |
+                Sort-Object FullName -Descending |
+                Select-Object -First 1
+        }
+        $cache = if ($manifest) { 'ok' } else { 'missing' }
+        $result = if ($config -eq 'enabled' -and $cache -eq 'ok') { 'OK' } else { 'FAIL' }
+        $action = if ($result -eq 'OK') { 'Ready' } else { 'Run team-tools-install.cmd or update-team-tools.ps1' }
+
+        [pscustomobject]@{
+            Plugin = $pluginRef
+            Config = $config
+            Cache = $cache
+            Result = $result
+            Action = $action
+        }
+    }
+    return @($rows)
+}
+
+function Test-CodexPlugins($ResolvedWorkspaceDir) {
+    foreach ($row in @(Get-CodexPluginRows $ResolvedWorkspaceDir)) {
+        if ($row.Result -eq 'OK') {
+            Write-Check 'OK' "Codex plugin ready: $($row.Plugin)" $CodexConfigFile
+        }
+        elseif ($row.Result -eq 'SKIP') {
+            Write-Check 'WARN' 'Codex plugin skipped' $row.Action
+        }
+        else {
+            Write-Check 'FAIL' "Codex plugin not ready: $($row.Plugin)" ("config={0}; cache={1}; {2}" -f $row.Config, $row.Cache, $row.Action)
+        }
+    }
+}
+
+function Get-CursorRuleRows($ResolvedWorkspaceDir) {
+    $cursorRoot = Join-Path $env:USERPROFILE '.cursor'
+    if (-not (Test-Path -LiteralPath $cursorRoot)) {
+        return @([pscustomobject]@{
+            Rule = 'Cursor'
+            Status = 'not installed'
+            Result = 'SKIP'
+            Action = 'Install Cursor, then run team-tools-install.cmd'
+        })
+    }
+
+    $sourceRulesDir = Join-Path $ResolvedWorkspaceDir 'project-coding-profiles\plugins\project-coding-profiles\.cursor\rules'
+    $ruleNames = @('encoding-guard.mdc', 'module-scaffold.mdc', 'url-locate.mdc')
+    $rows = foreach ($ruleName in $ruleNames) {
+        $target = Join-Path $CursorRulesDir ("yoooni-{0}" -f $ruleName)
+        $source = Join-Path $sourceRulesDir $ruleName
+        $status = 'missing'
+        $result = 'FAIL'
+        $action = 'Run team-tools-install.cmd or update-team-tools.ps1'
+        if ((Test-Path -LiteralPath $target) -and (Test-Path -LiteralPath $source)) {
+            $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+            $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+            if ($targetHash -eq $sourceHash) {
+                $status = 'current'
+                $result = 'OK'
+                $action = 'Ready'
+            }
+            else {
+                $status = 'stale'
+            }
+        }
+        elseif (-not (Test-Path -LiteralPath $source)) {
+            $status = 'source missing'
+        }
+
+        [pscustomobject]@{
+            Rule = "yoooni-$ruleName"
+            Status = $status
+            Result = $result
+            Action = $action
+        }
+    }
+    return @($rows)
+}
+
+function Test-CursorRules($ResolvedWorkspaceDir) {
+    foreach ($row in @(Get-CursorRuleRows $ResolvedWorkspaceDir)) {
+        if ($row.Result -eq 'OK') {
+            Write-Check 'OK' "Cursor rule ready: $($row.Rule)" $CursorRulesDir
+        }
+        elseif ($row.Result -eq 'SKIP') {
+            Write-Check 'WARN' 'Cursor rules skipped' $row.Action
+        }
+        else {
+            Write-Check 'FAIL' "Cursor rule not ready: $($row.Rule)" ("{0}; {1}" -f $row.Status, $row.Action)
+        }
+    }
+}
+
+function Get-KiroSteeringRows($ResolvedWorkspaceDir) {
+    $kiroRoot = Join-Path $env:USERPROFILE '.kiro'
+    if (-not (Test-Path -LiteralPath $kiroRoot)) {
+        return @([pscustomobject]@{
+            Steering = 'Kiro'
+            Status = 'not installed'
+            Result = 'SKIP'
+            Action = 'Install Kiro, then run team-tools-install.cmd'
+        })
+    }
+
+    if (-not (Test-Path -LiteralPath $KiroSteeringFile)) {
+        return @([pscustomobject]@{
+            Steering = 'yoooni-team-tools.md'
+            Status = 'missing'
+            Result = 'FAIL'
+            Action = 'Run team-tools-install.cmd or update-team-tools.ps1'
+        })
+    }
+
+    $text = Get-Content -LiteralPath $KiroSteeringFile -Raw -ErrorAction SilentlyContinue
+    $status = if ($text -match [regex]::Escape($ResolvedWorkspaceDir) -and $text -match 'project-coding-profiles' -and $text -match 'team-standards') { 'current' } else { 'stale' }
+    $result = if ($status -eq 'current') { 'OK' } else { 'FAIL' }
+    $action = if ($result -eq 'OK') { 'Ready' } else { 'Run update-team-tools.ps1' }
+    return @([pscustomobject]@{
+        Steering = 'yoooni-team-tools.md'
+        Status = $status
+        Result = $result
+        Action = $action
+    })
+}
+
+function Test-KiroSteering($ResolvedWorkspaceDir) {
+    foreach ($row in @(Get-KiroSteeringRows $ResolvedWorkspaceDir)) {
+        if ($row.Result -eq 'OK') {
+            Write-Check 'OK' "Kiro steering ready: $($row.Steering)" $KiroSteeringFile
+        }
+        elseif ($row.Result -eq 'SKIP') {
+            Write-Check 'WARN' 'Kiro steering skipped' $row.Action
+        }
+        else {
+            Write-Check 'FAIL' "Kiro steering not ready: $($row.Steering)" ("{0}; {1}" -f $row.Status, $row.Action)
+        }
+    }
+}
+
 function Write-FinalSummary {
     Write-Header 'Final Summary'
 
@@ -362,6 +722,21 @@ function Write-FinalSummary {
     Write-Host 'MCP connection table:' -ForegroundColor Cyan
     $mcpRows | Format-Table -AutoSize | Out-String | Write-Host
 
+    if ($script:ResolvedWorkspaceDir) {
+        Write-Host 'Codex MCP table:' -ForegroundColor Cyan
+        Get-CodexMcpRows $script:ResolvedWorkspaceDir | Format-Table -AutoSize | Out-String | Write-Host
+        Write-Host 'Cursor MCP table:' -ForegroundColor Cyan
+        Get-JsonMcpRows 'Cursor' (Join-Path $env:USERPROFILE '.cursor') $CursorConfigFile $script:ResolvedWorkspaceDir | Format-Table -AutoSize | Out-String | Write-Host
+        Write-Host 'Kiro MCP table:' -ForegroundColor Cyan
+        Get-JsonMcpRows 'Kiro' (Join-Path $env:USERPROFILE '.kiro') $KiroConfigFile $script:ResolvedWorkspaceDir | Format-Table -AutoSize | Out-String | Write-Host
+        Write-Host 'Codex plugin table:' -ForegroundColor Cyan
+        Get-CodexPluginRows $script:ResolvedWorkspaceDir | Format-Table -AutoSize | Out-String | Write-Host
+        Write-Host 'Cursor rules table:' -ForegroundColor Cyan
+        Get-CursorRuleRows $script:ResolvedWorkspaceDir | Format-Table -AutoSize | Out-String | Write-Host
+        Write-Host 'Kiro steering table:' -ForegroundColor Cyan
+        Get-KiroSteeringRows $script:ResolvedWorkspaceDir | Format-Table -AutoSize | Out-String | Write-Host
+    }
+
     $taskOutput = Invoke-TextCommand { schtasks /Query /TN $AutoUpdateTaskName /FO LIST }
     $taskStatus = 'missing'
     if ($LASTEXITCODE -eq 0 -and $taskOutput -match [regex]::Escape($AutoUpdateTaskName)) {
@@ -401,6 +776,7 @@ foreach ($cmd in @('git', 'node', 'npm', 'claude')) {
 
 Write-Header '2. Local Files'
 $resolvedWorkspaceDir = Resolve-WorkspaceDir
+$script:ResolvedWorkspaceDir = $resolvedWorkspaceDir
 Test-WorkspaceRepos $resolvedWorkspaceDir
 $installedPlugins = Read-InstalledPlugins
 Test-PluginRecord $installedPlugins
@@ -411,7 +787,17 @@ Test-PluginCli
 Write-Header '4. MCP Servers'
 Test-McpCli
 
-Write-Header '5. Auto Update'
+Write-Header '5. Tool MCP Configs'
+Test-CodexMcpConfig $resolvedWorkspaceDir
+Test-JsonMcpConfig 'Cursor' (Join-Path $env:USERPROFILE '.cursor') $CursorConfigFile $resolvedWorkspaceDir
+Test-JsonMcpConfig 'Kiro' (Join-Path $env:USERPROFILE '.kiro') $KiroConfigFile $resolvedWorkspaceDir
+
+Write-Header '6. Tool Plugin Equivalents'
+Test-CodexPlugins $resolvedWorkspaceDir
+Test-CursorRules $resolvedWorkspaceDir
+Test-KiroSteering $resolvedWorkspaceDir
+
+Write-Header '7. Auto Update'
 Test-AutoUpdateTask
 
 Write-FinalSummary

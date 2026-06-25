@@ -25,6 +25,237 @@ $cfg    = Join-Path $state 'workspace.path'
 function Log($m){ Add-Content -Path $log -Value ("[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m) }
 function Has($c){ [bool](Get-Command $c -ErrorAction SilentlyContinue) }
 function HasPdk($w){ return ($w -and (Test-Path (Join-Path $w 'project-domain-knowledge\.git'))) }
+function Escape-TomlString($s){ return (($s -replace '\\','/') -replace '"','\"') }
+
+function New-CodexMcpBlock($name, $server) {
+  $argsToml = ($server.args | ForEach-Object { '"' + (Escape-TomlString $_) + '"' }) -join ', '
+  $envPairs = @()
+  if ($server.env) {
+    foreach ($p in $server.env.PSObject.Properties) {
+      $envPairs += '"' + $p.Name + '" = "' + (Escape-TomlString $p.Value) + '"'
+    }
+  }
+  $envToml = $envPairs -join ', '
+  $block = "`n[mcp_servers.`"$name`"]`n"
+  $block += "command = `"$($server.command)`"`n"
+  $block += "args = [$argsToml]`n"
+  if ($envToml) { $block += "env = { $envToml }`n" }
+  return $block
+}
+
+function Sync-CodexMcpConfig($codexRoot, $configPath, $servers) {
+  if (-not (Test-Path $codexRoot)) { return $null }
+  $existing = ''
+  if (Test-Path $configPath) { $existing = (Get-Content $configPath -Raw -ErrorAction SilentlyContinue) }
+  if ($null -eq $existing) { $existing = '' }
+
+  $text = $existing
+  $added = @()
+  $updated = @()
+  foreach ($name in $servers.Keys) {
+    $block = New-CodexMcpBlock $name $servers[$name]
+    $escaped = [regex]::Escape($name)
+    $pattern = '(?ms)^\[mcp_servers\.(?:"' + $escaped + '"|' + $escaped + ')\]\s*\r?\n.*?(?=^\[|\z)'
+    if ($text -match $pattern) {
+      $current = $Matches[0]
+      if ($current.Trim() -ne $block.Trim()) {
+        $text = [regex]::Replace($text, $pattern, $block.TrimStart(), 1)
+        $updated += $name
+      }
+    }
+    else {
+      $sep = if ($text -and -not $text.EndsWith("`n")) { "`n" } else { '' }
+      $text += $sep + $block
+      $added += $name
+    }
+  }
+
+  if ($text -ne $existing) {
+    $dir = Split-Path $configPath
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    [IO.File]::WriteAllText($configPath, $text, $utf8)
+  }
+  return [pscustomobject]@{ Added = $added; Updated = $updated }
+}
+
+function Sync-JsonMcpConfig($toolRoot, $configPath, $servers) {
+  if (-not (Test-Path $toolRoot)) { return $null }
+  $root = $null
+  if (Test-Path $configPath) {
+    try { $root = Get-Content $configPath -Raw -ErrorAction Stop | ConvertFrom-Json } catch { $root = $null }
+  }
+  if (-not $root) { $root = [pscustomobject]@{} }
+  if (-not ($root.PSObject.Properties.Name -contains 'mcpServers')) {
+    $root | Add-Member -NotePropertyName 'mcpServers' -NotePropertyValue ([pscustomobject]@{})
+  }
+
+  $added = @()
+  $updated = @()
+  foreach ($name in $servers.Keys) {
+    $nextJson = $servers[$name] | ConvertTo-Json -Depth 12 -Compress
+    if ($root.mcpServers.PSObject.Properties.Name -contains $name) {
+      $currentJson = $root.mcpServers.$name | ConvertTo-Json -Depth 12 -Compress
+      if ($currentJson -ne $nextJson) {
+        $root.mcpServers.$name = $servers[$name]
+        $updated += $name
+      }
+    }
+    else {
+      $root.mcpServers | Add-Member -NotePropertyName $name -NotePropertyValue $servers[$name]
+      $added += $name
+    }
+  }
+
+  if ($added.Count -or $updated.Count) {
+    $dir = Split-Path $configPath
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    [IO.File]::WriteAllText($configPath, ($root | ConvertTo-Json -Depth 12), $utf8)
+  }
+  return [pscustomobject]@{ Added = $added; Updated = $updated }
+}
+
+function Find-RepoDir($name, $workspaceDir) {
+  $candidate = Join-Path $workspaceDir $name
+  if (Test-Path (Join-Path $candidate '.git')) { return $candidate }
+
+  $dir = $PSScriptRoot
+  while ($dir) {
+    if ((Split-Path $dir -Leaf) -eq $name -and (Test-Path (Join-Path $dir '.git'))) { return $dir }
+    $parent = Split-Path $dir -Parent
+    if (-not $parent -or $parent -eq $dir) { break }
+    $dir = $parent
+  }
+  return $candidate
+}
+
+function Get-GitRevision($repoDir) {
+  if (-not (Test-Path (Join-Path $repoDir '.git'))) { return '' }
+  return ((git -C $repoDir rev-parse HEAD 2>$null) | Out-String).Trim()
+}
+
+function Get-CodexPluginDir($repoDir, $pluginName) {
+  $dir = Join-Path $repoDir ("plugins\{0}" -f $pluginName)
+  if (Test-Path (Join-Path $dir '.codex-plugin\plugin.json')) { return $dir }
+  if (Test-Path (Join-Path $repoDir '.codex-plugin\plugin.json')) { return $repoDir }
+  return $dir
+}
+
+function New-CodexMarketplaceBlock($name, $source, $revision) {
+  $updated = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+  $block = "`n[marketplaces.$name]`n"
+  $block += "last_updated = `"$updated`"`n"
+  if ($revision) { $block += "last_revision = `"$revision`"`n" }
+  $block += "source_type = `"git`"`n"
+  $block += "source = `"$source`"`n"
+  return $block
+}
+
+function New-CodexPluginBlock($pluginRef) {
+  return "`n[plugins.`"$pluginRef`"]`nenabled = true`n"
+}
+
+function Sync-TomlTableBlock($text, $pattern, $block, [ref]$changed) {
+  if ($text -match $pattern) {
+    $current = $Matches[0]
+    if ($current.Trim() -ne $block.Trim()) {
+      $changed.Value = $true
+      return [regex]::Replace($text, $pattern, $block.TrimStart(), 1)
+    }
+    return $text
+  }
+
+  $sep = if ($text -and -not $text.EndsWith("`n")) { "`n" } else { '' }
+  $changed.Value = $true
+  return $text + $sep + $block
+}
+
+function Sync-CodexPlugins($codexRoot, $configPath, $plugins) {
+  if (-not (Test-Path $codexRoot)) { return $null }
+  $existing = ''
+  if (Test-Path $configPath) { $existing = (Get-Content $configPath -Raw -ErrorAction SilentlyContinue) }
+  if ($null -eq $existing) { $existing = '' }
+
+  $text = $existing
+  $configured = @()
+  $cached = @()
+  $skipped = @()
+  foreach ($p in $plugins) {
+    $manifest = Join-Path $p.PluginDir '.codex-plugin\plugin.json'
+    if (-not (Test-Path $manifest)) {
+      $skipped += $p.Name
+      continue
+    }
+
+    $version = '0.0.0'
+    try {
+      $manifestJson = Get-Content $manifest -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ($manifestJson.version) { $version = $manifestJson.version }
+    } catch {}
+
+    $cacheRoot = [IO.Path]::GetFullPath((Join-Path $codexRoot 'plugins\cache'))
+    $cacheDir = [IO.Path]::GetFullPath((Join-Path $cacheRoot ("{0}\{1}\{2}" -f $p.Marketplace, $p.Name, $version)))
+    if (-not $cacheDir.StartsWith($cacheRoot, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "Refuse to write outside Codex plugin cache: $cacheDir"
+    }
+    if (Test-Path $cacheDir) { Remove-Item -LiteralPath $cacheDir -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path (Split-Path $cacheDir) | Out-Null
+    Copy-Item -LiteralPath $p.PluginDir -Destination $cacheDir -Recurse -Force
+    $cached += ("{0}@{1}" -f $p.Name, $version)
+
+    $revision = Get-GitRevision $p.RepoDir
+    $marketPattern = '(?ms)^\[marketplaces\.' + [regex]::Escape($p.Marketplace) + '\]\s*\r?\n.*?(?=^\[|\z)'
+    $pluginRef = "{0}@{1}" -f $p.Name, $p.Marketplace
+    $pluginPattern = '(?ms)^\[plugins\."' + [regex]::Escape($pluginRef) + '"\]\s*\r?\n.*?(?=^\[|\z)'
+    $changed = $false
+    $text = Sync-TomlTableBlock $text $marketPattern (New-CodexMarketplaceBlock $p.Marketplace $p.Url $revision) ([ref]$changed)
+    $text = Sync-TomlTableBlock $text $pluginPattern (New-CodexPluginBlock $pluginRef) ([ref]$changed)
+    $configured += $pluginRef
+  }
+
+  if ($text -ne $existing) {
+    $dir = Split-Path $configPath
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    [IO.File]::WriteAllText($configPath, $text, $utf8)
+  }
+
+  return [pscustomobject]@{ Configured = $configured; Cached = $cached; Skipped = $skipped }
+}
+
+function Sync-CursorRules($cursorRoot, $sourceRulesDir) {
+  if (-not (Test-Path $cursorRoot)) { return $null }
+  if (-not (Test-Path $sourceRulesDir)) { return [pscustomobject]@{ Synced = @(); Skipped = @('missing source rules') } }
+
+  $targetDir = Join-Path $cursorRoot 'rules'
+  New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+  $synced = @()
+  foreach ($file in @(Get-ChildItem -Path $sourceRulesDir -Filter '*.mdc' -File -ErrorAction SilentlyContinue)) {
+    $target = Join-Path $targetDir ("yoooni-{0}" -f $file.Name)
+    Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+    $synced += (Split-Path $target -Leaf)
+  }
+  return [pscustomobject]@{ Synced = $synced; Skipped = @() }
+}
+
+function Sync-KiroSteering($kiroRoot, $workspaceDir, $pluginRepos) {
+  if (-not (Test-Path $kiroRoot)) { return $null }
+  $targetDir = Join-Path $kiroRoot 'steering'
+  New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+  $target = Join-Path $targetDir 'yoooni-team-tools.md'
+  $lines = @(
+    '# Yoooni Team Tools',
+    '',
+    'Use the installed Yoooni team tools as the default coding guidance for company projects.',
+    '',
+    ('Workspace: {0}' -f $workspaceDir),
+    ('team-standards: {0}' -f $pluginRepos['team-standards']),
+    ('project-coding-profiles: {0}' -f $pluginRepos['project-coding-profiles']),
+    ('yoooni-daily-plugin: {0}' -f $pluginRepos['yoooni-daily-plugin']),
+    '',
+    'Before editing code, follow the relevant coding standards, project profile, encoding profile, and registered MCP knowledge sources.'
+  )
+  [IO.File]::WriteAllText($target, ($lines -join "`n") + "`n", $utf8)
+  return $target
+}
 
 # --- 自动定位 WorkspaceDir：参数 -> 环境变量 -> 配置 -> claude mcp 解析 -> 跨盘探测 -> 默认 ---
 $cands = @()
@@ -46,6 +277,15 @@ if (-not $WorkspaceDir) { $WorkspaceDir = (Join-Path $env:USERPROFILE 'myWork') 
 Log "=== update start (ws=$WorkspaceDir, scope=$McpScope) ==="
 $mcpDir  = Join-Path $WorkspaceDir 'project-domain-knowledge'
 $topoDir = Join-Path $WorkspaceDir 'cross-project-topology'
+$pluginUrls = @{
+  'team-standards' = 'https://gitee.com/wyoooni/team-standards.git'
+  'project-coding-profiles' = 'https://gitee.com/wyoooni/project-coding-profiles.git'
+  'yoooni-daily-plugin' = 'https://gitee.com/wyoooni/yoooni-daily-plugin.git'
+}
+$pluginRepos = @{}
+foreach ($pluginName in $pluginUrls.Keys) {
+  $pluginRepos[$pluginName] = Find-RepoDir $pluginName $WorkspaceDir
+}
 $pdkChanged = $false
 $anyChanged = $false
 
@@ -59,6 +299,15 @@ foreach ($d in @($mcpDir, $topoDir)) {
   } else { Log ("  skip (not cloned): " + $d) }
 }
 
+foreach ($pluginName in $pluginUrls.Keys) {
+  $repoDir = $pluginRepos[$pluginName]
+  if (Test-Path (Join-Path $repoDir '.git')) {
+    git -C $repoDir pull --ff-only 2>&1 | ForEach-Object { Log ("  git plugin " + $_) }
+  } else {
+    Log ("  skip plugin repo (not cloned): " + $repoDir)
+  }
+}
+
 if ($pdkChanged -and (Has npm)) {
   Push-Location $mcpDir
   try { Log "  npm install/build (engine updated)"; npm install 2>&1 | ForEach-Object { Log ("  npm " + $_) }; npm run build 2>&1 | ForEach-Object { Log ("  build " + $_) } }
@@ -66,10 +315,10 @@ if ($pdkChanged -and (Has npm)) {
 }
 
 $entry = Join-Path $mcpDir 'dist\server.js'
+$domainKb = Join-Path $mcpDir 'knowledge'
+$topoKb   = Join-Path $topoDir 'knowledge'
 # 仅当仓库内容有更新时才重注册(触发 MCP 下次会话重启、加载新知识/引擎)；无变化不动，省churn
 if ($anyChanged -and (Has claude) -and (Test-Path $entry)) {
-  $domainKb = Join-Path $mcpDir 'knowledge'
-  $topoKb   = Join-Path $topoDir 'knowledge'
   claude mcp remove domain-knowledge -s $McpScope 2>$null | Out-Null
   # '--' 必须带引号：裸 -- 会被 PowerShell 吞掉，导致变参 -e 吞掉 node+路径而报 missing commandOrUrl
   claude mcp add domain-knowledge -s $McpScope -e "DOMAIN_KB_DIR=$domainKb" '--' node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
@@ -77,6 +326,83 @@ if ($anyChanged -and (Has claude) -and (Test-Path $entry)) {
     claude mcp remove cross-topology -s $McpScope 2>$null | Out-Null
     claude mcp add cross-topology -s $McpScope -e "DOMAIN_KB_DIR=$topoKb" '--' node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
   }
+}
+
+if (Test-Path $entry) {
+  $codexRoot = Join-Path $env:USERPROFILE '.codex'
+  $codexCfg = Join-Path $codexRoot 'config.toml'
+  $entryFwd = $entry -replace '\\','/'
+  $domainKbFwd = $domainKb -replace '\\','/'
+  $codexMcp = [ordered]@{
+    'domain-knowledge' = [pscustomobject]@{ command = 'node'; args = @($entryFwd); env = [pscustomobject]@{ DOMAIN_KB_DIR = $domainKbFwd } }
+  }
+  if (Test-Path $topoKb) {
+    $topoKbFwd = $topoKb -replace '\\','/'
+    $codexMcp['cross-topology'] = [pscustomobject]@{ command = 'node'; args = @($entryFwd); env = [pscustomobject]@{ DOMAIN_KB_DIR = $topoKbFwd } }
+  }
+  $codexResult = Sync-CodexMcpConfig $codexRoot $codexCfg $codexMcp
+  if ($null -eq $codexResult) {
+    Log "  codex: ~/.codex 不存在，跳过 MCP 配置同步"
+  }
+  elseif ($codexResult.Added.Count -or $codexResult.Updated.Count) {
+    Log ("  codex: MCP synced added={0}, updated={1}" -f ($codexResult.Added -join ','), ($codexResult.Updated -join ','))
+  }
+  else {
+    Log "  codex: MCP config already current"
+  }
+
+  $jsonMcp = [ordered]@{
+    'domain-knowledge' = [pscustomobject]@{ command = 'node'; args = @($entryFwd); env = [pscustomobject]@{ DOMAIN_KB_DIR = $domainKbFwd } }
+  }
+  if (Test-Path $topoKb) {
+    $jsonMcp['cross-topology'] = [pscustomobject]@{ command = 'node'; args = @($entryFwd); env = [pscustomobject]@{ DOMAIN_KB_DIR = $topoKbFwd } }
+  }
+  $toolTargets = @(
+    @{ Name = 'cursor'; Root = (Join-Path $env:USERPROFILE '.cursor'); Config = (Join-Path $env:USERPROFILE '.cursor\mcp.json') },
+    @{ Name = 'kiro'; Root = (Join-Path $env:USERPROFILE '.kiro'); Config = (Join-Path $env:USERPROFILE '.kiro\settings\mcp.json') }
+  )
+  foreach ($target in $toolTargets) {
+    $syncResult = Sync-JsonMcpConfig $target.Root $target.Config $jsonMcp
+    if ($null -eq $syncResult) {
+      Log ("  {0}: root not found, skip MCP config" -f $target.Name)
+    }
+    elseif ($syncResult.Added.Count -or $syncResult.Updated.Count) {
+      Log ("  {0}: MCP synced added={1}, updated={2}" -f $target.Name, ($syncResult.Added -join ','), ($syncResult.Updated -join ','))
+    }
+    else {
+      Log ("  {0}: MCP config already current" -f $target.Name)
+    }
+  }
+}
+
+$codexPluginDefs = @(
+  [pscustomobject]@{ Name = 'team-standards'; Marketplace = 'team-standards'; Url = $pluginUrls['team-standards']; RepoDir = $pluginRepos['team-standards']; PluginDir = (Get-CodexPluginDir $pluginRepos['team-standards'] 'team-standards') },
+  [pscustomobject]@{ Name = 'project-coding-profiles'; Marketplace = 'project-coding-profiles'; Url = $pluginUrls['project-coding-profiles']; RepoDir = $pluginRepos['project-coding-profiles']; PluginDir = (Get-CodexPluginDir $pluginRepos['project-coding-profiles'] 'project-coding-profiles') },
+  [pscustomobject]@{ Name = 'yoooni-daily-plugin'; Marketplace = 'yoooni-daily-plugin'; Url = $pluginUrls['yoooni-daily-plugin']; RepoDir = $pluginRepos['yoooni-daily-plugin']; PluginDir = (Get-CodexPluginDir $pluginRepos['yoooni-daily-plugin'] 'yoooni-daily-plugin') }
+)
+$codexPluginResult = Sync-CodexPlugins (Join-Path $env:USERPROFILE '.codex') (Join-Path $env:USERPROFILE '.codex\config.toml') $codexPluginDefs
+if ($null -eq $codexPluginResult) {
+  Log "  codex: ~/.codex 不存在，跳过 plugin 安装/更新"
+}
+else {
+  Log ("  codex: plugins configured={0}, cached={1}, skipped={2}" -f ($codexPluginResult.Configured -join ','), ($codexPluginResult.Cached -join ','), ($codexPluginResult.Skipped -join ','))
+}
+
+$profilePluginDir = Get-CodexPluginDir $pluginRepos['project-coding-profiles'] 'project-coding-profiles'
+$cursorRuleResult = Sync-CursorRules (Join-Path $env:USERPROFILE '.cursor') (Join-Path $profilePluginDir '.cursor\rules')
+if ($null -eq $cursorRuleResult) {
+  Log "  cursor: ~/.cursor 不存在，跳过规则同步"
+}
+else {
+  Log ("  cursor: rules synced={0}" -f ($cursorRuleResult.Synced -join ','))
+}
+
+$kiroSteering = Sync-KiroSteering (Join-Path $env:USERPROFILE '.kiro') $WorkspaceDir $pluginRepos
+if ($null -eq $kiroSteering) {
+  Log "  kiro: ~/.kiro 不存在，跳过 steering 同步"
+}
+else {
+  Log ("  kiro: steering synced -> " + $kiroSteering)
 }
 
 # --- 插件：claude plugin 现为完整 CLI，可全自动更新(无需本地克隆源码，直接走已注册 marketplace) ---
