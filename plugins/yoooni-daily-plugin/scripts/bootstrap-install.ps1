@@ -129,16 +129,22 @@ else { Write-Host '  (claude 缺失，跳过本体插件安装)' -ForegroundColo
 # --- 2) 关联插件 + MCP：委托本体内的 install-team-tools.ps1（幂等）---
 Write-Host ''
 Write-Host '[2/3] 关联插件 + MCP（委托 install-team-tools.ps1）...' -ForegroundColor Green
-$installer = Join-Path $selfDir 'skills\yoooni-install-team-tools\install-team-tools.ps1'
+# 兼容两种仓库布局：新版子目录布局 plugins\yoooni-daily-plugin\ 优先，旧版根布局兜底。
+# （仓库已重构为子目录布局后，skills/ 与 scripts/ 都在 plugins\yoooni-daily-plugin\ 下。）
+$pluginRoot = $selfDir
+if (Test-Path (Join-Path $selfDir 'plugins\yoooni-daily-plugin\.claude-plugin\plugin.json')) {
+    $pluginRoot = Join-Path $selfDir 'plugins\yoooni-daily-plugin'
+}
+$installer = Join-Path $pluginRoot 'skills\yoooni-install-team-tools\install-team-tools.ps1'
 if (Test-Path $installer) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File $installer -WorkspaceDir $WorkspaceDir -Scope $Scope
 }
-else { Write-Warning "未找到 $installer（本体克隆可能失败）。检查网络后重跑本脚本。" }
+else { Write-Warning "未找到 $installer（本体克隆可能失败 / 布局变更）。检查网络后重跑本脚本。" }
 
 # --- 3) 注册定时自动更新任务（委托 register-autoupdate-task.ps1）---
 Write-Host ''
 Write-Host '[3/3] 注册定时自动更新任务...' -ForegroundColor Green
-$register = Join-Path $selfDir 'scripts\register-autoupdate-task.ps1'
+$register = Join-Path $pluginRoot 'scripts\register-autoupdate-task.ps1'
 if ($EveryHours -le 0) { Write-Host '  (EveryHours<=0，跳过定时任务注册)' -ForegroundColor DarkGray }
 elseif (Test-Path $register) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File $register -EveryHours $EveryHours

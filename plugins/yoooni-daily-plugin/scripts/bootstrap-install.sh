@@ -51,13 +51,16 @@ fi
 
 # --- 2) 关联插件 + MCP：委托 install-team-tools.sh ---
 echo ""; echo "[2/3] 关联插件 + MCP（委托 install-team-tools.sh）..."
-installer="$self_dir/skills/yoooni-install-team-tools/install-team-tools.sh"
+# 兼容两种仓库布局：新版子目录布局 plugins/yoooni-daily-plugin/ 优先，旧版根布局兜底。
+plugin_root="$self_dir"
+if [ -f "$self_dir/plugins/yoooni-daily-plugin/.claude-plugin/plugin.json" ]; then plugin_root="$self_dir/plugins/yoooni-daily-plugin"; fi
+installer="$plugin_root/skills/yoooni-install-team-tools/install-team-tools.sh"
 if [ -f "$installer" ]; then bash "$installer" -w "$WORKSPACE_DIR" -s "$SCOPE"
-else echo "  [warn] 未找到 $installer（本体克隆可能失败），检查网络后重跑。"; fi
+else echo "  [warn] 未找到 $installer（本体克隆可能失败 / 布局变更），检查网络后重跑。"; fi
 
 # --- 3) 注册定时自动更新（launchd，仅 macOS）---
 echo ""; echo "[3/3] 注册定时自动更新任务..."
-register="$self_dir/scripts/register-autoupdate-task.sh"
+register="$plugin_root/scripts/register-autoupdate-task.sh"
 if [ "$EVERY_HOURS" -le 0 ]; then echo "  (every-hours<=0，跳过)"
 elif [ "$(uname -s)" != "Darwin" ]; then echo "  (非 macOS，跳过 launchd；Linux 请用 cron 调 ~/.kai-toolbox/run-update.sh)"
 elif [ -f "$register" ]; then bash "$register" --every-hours "$EVERY_HOURS"
