@@ -61,6 +61,40 @@ function Add-McpToJsonConfig($toolRoot, $configPath, $servers) {
     return $added
 }
 
+# 幂等把若干 MCP server 追加进 Codex 的 TOML 配置(~/.codex/config.toml)。
+#   Codex MCP 格式: [mcp_servers.<name>] command/args/env。TOML 不便整体重写,故采用
+#   "检测已存在 -> 不动;缺失 -> 追加表块到文件末尾" 的策略(幂等、不破坏现有内容)。
+#   仅当 ~/.codex 目录存在(即装了 Codex)才写;否则返回 $null。
+function Add-McpToTomlConfig($codexRoot, $configPath, $servers) {
+    if (-not (Test-Path $codexRoot)) { return $null }   # 未装 Codex
+    $existing = ''
+    if (Test-Path $configPath) { $existing = (Get-Content $configPath -Raw -ErrorAction SilentlyContinue) }
+    if ($null -eq $existing) { $existing = '' }
+    $added = @()
+    $append = ''
+    foreach ($name in $servers.Keys) {
+        # 已有 [mcp_servers.<name>] 表头(允许点号 key 带或不带引号)=> 跳过
+        $pat = '(?m)^\s*\[mcp_servers\.(?:"' + [regex]::Escape($name) + '"|' + [regex]::Escape($name) + ')\]'
+        if ($existing -match $pat) { continue }
+        $s = $servers[$name]
+        $argsToml = ($s.args | ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' }) -join ', '
+        # env 是 PSCustomObject:遍历其属性名取值
+        $envPairs = @()
+        if ($s.env) { foreach ($p in $s.env.PSObject.Properties) { $envPairs += '"' + $p.Name + '" = "' + ($p.Value -replace '\\', '/') + '"' } }
+        $envToml = $envPairs -join ', '
+        $append += "`n[mcp_servers.$name]`n"
+        $append += "command = `"$($s.command)`"`n"
+        $append += "args = [$argsToml]`n"
+        if ($envToml) { $append += "env = { $envToml }`n" }
+        $added += $name
+    }
+    if ($append) {
+        $sep = if ($existing -and -not $existing.EndsWith("`n")) { "`n" } else { '' }
+        [IO.File]::WriteAllText($configPath, $existing + $sep + $append, $utf8)
+    }
+    return $added
+}
+
 # Gitee 是公司当前源码管理（GitHub 仅部分仓库镜像，安装一律用 Gitee）
 $Repos = @(
     @{ Name = 'team-standards';           Url = 'https://gitee.com/wyoooni/team-standards.git';           Type = 'plugin' }
@@ -196,7 +230,7 @@ if ($hasClaude -and -not (Test-Path $topoKbDir)) {
 # Claude Code 的 MCP 走 claude CLI（上面第 2 步）；Cursor / Kiro 走各自的 JSON 配置文件。
 # 一份 dist/server.js + DOMAIN_KB_DIR 指不同知识根 => 各工具里都得到 domain-knowledge + cross-topology 两实例。
 Write-Host ""
-Write-Host "[2.5] 注册 MCP 到 Cursor / Kiro（同格式 JSON，已存在跳过）..." -ForegroundColor Green
+Write-Host "[2.5] 注册 MCP 到 Cursor / Kiro / Codex（各自配置格式，已存在跳过）..." -ForegroundColor Green
 $entryFwd = ($mcpEntry -replace '\\', '/')
 $domainKbFwd = ($domainKbDir -replace '\\', '/')
 $topoKbFwd = ($topoKbDir -replace '\\', '/')
@@ -222,8 +256,15 @@ if ($otherMcp.Count -gt 0) {
         elseif ($res.Count -gt 0) { Write-Host "  + $($t.Tool): 写入 $($res -join ', ') -> $($t.Config)"; $newOtherMcp += "$($t.Tool)($($res -join '/'))" }
         else { Write-Host "  = $($t.Tool): 已有同名 MCP，跳过" -ForegroundColor DarkGray; $skipOtherMcp += $t.Tool }
     }
+    # Codex：TOML 配置（~/.codex/config.toml），格式不同，单独处理
+    $codexRoot = Join-Path $env:USERPROFILE '.codex'
+    $codexCfg  = Join-Path $codexRoot 'config.toml'
+    $cres = Add-McpToTomlConfig $codexRoot $codexCfg $otherMcp
+    if ($null -eq $cres) { Write-Host "  - Codex 未安装（无 $codexRoot），跳过" -ForegroundColor DarkGray }
+    elseif ($cres.Count -gt 0) { Write-Host "  + Codex: 追加 $($cres -join ', ') -> $codexCfg"; $newOtherMcp += "Codex($($cres -join '/'))" }
+    else { Write-Host "  = Codex: 已有同名 MCP，跳过" -ForegroundColor DarkGray; $skipOtherMcp += 'Codex' }
 } else {
-    Write-Host "  (未找到 dist/server.js，Cursor/Kiro 的 MCP 注册跳过；先让 MCP 引擎构建成功)" -ForegroundColor DarkYellow
+    Write-Host "  (未找到 dist/server.js，Cursor/Kiro/Codex 的 MCP 注册跳过；先让 MCP 引擎构建成功)" -ForegroundColor DarkYellow
 }
 
 # --- 第 3 步：插件（claude plugin CLI 全自动；已安装跳过，更新交给 update skill）---
