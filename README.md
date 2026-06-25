@@ -1,6 +1,6 @@
 # yoooni-daily-plugin
 
-Yoooni 团队日常工作 Claude Code 插件。包含 **9 个 Skill** + **SessionStart 自动更新 hook**（每日后台刷新公司 MCP 仓），后续按需扩展。
+Yoooni 团队日常工作 Claude Code 插件。包含 **10 个 Skill** + **SessionStart 自动更新 hook**（每日后台刷新公司 MCP 仓），后续按需扩展。
 
 ## 快速开始（60 秒）
 
@@ -65,6 +65,7 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 | [yoooni-prod-log-query](skills/yoooni-prod-log-query/SKILL.md) | 查生产后台接口注册日志（apiRegistrylog）排查线上 | "查生产日志"、"查接口日志"、"排查线上 XX 接口"、"apiRegistrylog" |
 | [yoooni-taskspace](skills/yoooni-taskspace/SKILL.md) | 跨目录任务空间：选择多个项目并用链接聚合到一个工作区 | "创建任务空间"、"合并几个项目"、"一键选择创建软链接"、"taskspace" |
 | [yoooni-hook-report](skills/yoooni-hook-report/SKILL.md) | hook 命中周报：聚合 \\IT01 共享里的 warn hook 命中事件出统计，定升不升 block | "hook 命中周报"、"规则命中排行"、"大家踩了哪些规范"、"哪条规则该升 block" |
+| [yoooni-onboard-pipeline](skills/yoooni-onboard-pipeline/SKILL.md) | 新项目初始化流水线：拉项目→画像/CLAUDE.md→知识图谱→编码profile→前后端聚合→跨项目拓扑，编排已有能力、机械步自动跑、判断点设人工关卡 | "初始化新项目"、"一键 onboard"、"接入一个新系统"、"项目初始化流水线"、"工作台初始化作业" |
 
 ## Skills 详细说明
 
