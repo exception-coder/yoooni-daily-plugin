@@ -35,6 +35,32 @@ $cfg  = Join-Path $env:USERPROFILE '.kai-toolbox\workspace.path'
 function Test-Cmd($name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
 function HasPdk($w) { return ($w -and (Test-Path (Join-Path $w 'project-domain-knowledge\.git'))) }
 
+# 幂等把若干 MCP server 写进某 AI 工具的 mcpServers JSON 配置(Cursor / Kiro 同格式)。
+#   - 工具根目录不存在 => 视为未安装,返回 $null(跳过)。
+#   - 已有同名 server => 跳过,不覆盖(更新交给 update skill)。
+#   - 路径统一用正斜杠(node 跨平台可用,且免 JSON 反斜杠转义困扰)。
+function Add-McpToJsonConfig($toolRoot, $configPath, $servers) {
+    if (-not (Test-Path $toolRoot)) { return $null }   # 工具未安装
+    $dir = Split-Path $configPath
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    $root = $null
+    if (Test-Path $configPath) {
+        try { $root = (Get-Content $configPath -Raw -ErrorAction Stop | ConvertFrom-Json) } catch { $root = $null }
+    }
+    if (-not $root) { $root = [PSCustomObject]@{} }
+    if (-not ($root.PSObject.Properties.Name -contains 'mcpServers')) {
+        $root | Add-Member -NotePropertyName 'mcpServers' -NotePropertyValue ([PSCustomObject]@{})
+    }
+    $added = @()
+    foreach ($name in $servers.Keys) {
+        if ($root.mcpServers.PSObject.Properties.Name -contains $name) { continue }  # 已存在,不覆盖
+        $root.mcpServers | Add-Member -NotePropertyName $name -NotePropertyValue $servers[$name]
+        $added += $name
+    }
+    [IO.File]::WriteAllText($configPath, ($root | ConvertTo-Json -Depth 12), $utf8)
+    return $added
+}
+
 # Gitee 是公司当前源码管理（GitHub 仅部分仓库镜像，安装一律用 Gitee）
 $Repos = @(
     @{ Name = 'team-standards';           Url = 'https://gitee.com/wyoooni/team-standards.git';           Type = 'plugin' }
@@ -166,6 +192,40 @@ if ($hasClaude -and -not (Test-Path $topoKbDir)) {
     Write-Warning "未找到 $topoKbDir（cross-project-topology 尚无 knowledge/ 根目录），cross-topology 未注册。内容就绪后用 update skill 刷新即可。"
 }
 
+# --- 第 2.5 步：把同两个 MCP 也注册进 Cursor / Kiro（同格式 mcpServers JSON，幂等不覆盖）---
+# Claude Code 的 MCP 走 claude CLI（上面第 2 步）；Cursor / Kiro 走各自的 JSON 配置文件。
+# 一份 dist/server.js + DOMAIN_KB_DIR 指不同知识根 => 各工具里都得到 domain-knowledge + cross-topology 两实例。
+Write-Host ""
+Write-Host "[2.5] 注册 MCP 到 Cursor / Kiro（同格式 JSON，已存在跳过）..." -ForegroundColor Green
+$entryFwd = ($mcpEntry -replace '\\', '/')
+$domainKbFwd = ($domainKbDir -replace '\\', '/')
+$topoKbFwd = ($topoKbDir -replace '\\', '/')
+
+$otherMcp = [ordered]@{}
+if (Test-Path $mcpEntry) {
+    $otherMcp['domain-knowledge'] = [PSCustomObject]@{ command = 'node'; args = @($entryFwd); env = [PSCustomObject]@{ DOMAIN_KB_DIR = $domainKbFwd } }
+    if (Test-Path $topoKbDir) {
+        $otherMcp['cross-topology'] = [PSCustomObject]@{ command = 'node'; args = @($entryFwd); env = [PSCustomObject]@{ DOMAIN_KB_DIR = $topoKbFwd } }
+    }
+}
+
+# 各工具的【用户级】MCP 配置路径（与 Scope=user 对齐；项目级各工具放项目根，按需另配）
+$toolTargets = @(
+    @{ Tool = 'Cursor'; Root = (Join-Path $env:USERPROFILE '.cursor'); Config = (Join-Path $env:USERPROFILE '.cursor\mcp.json') }
+    @{ Tool = 'Kiro';   Root = (Join-Path $env:USERPROFILE '.kiro');   Config = (Join-Path $env:USERPROFILE '.kiro\settings\mcp.json') }
+)
+$newOtherMcp = @(); $skipOtherMcp = @()
+if ($otherMcp.Count -gt 0) {
+    foreach ($t in $toolTargets) {
+        $res = Add-McpToJsonConfig $t.Root $t.Config $otherMcp
+        if ($null -eq $res) { Write-Host "  - $($t.Tool) 未安装（无 $($t.Root)），跳过" -ForegroundColor DarkGray }
+        elseif ($res.Count -gt 0) { Write-Host "  + $($t.Tool): 写入 $($res -join ', ') -> $($t.Config)"; $newOtherMcp += "$($t.Tool)($($res -join '/'))" }
+        else { Write-Host "  = $($t.Tool): 已有同名 MCP，跳过" -ForegroundColor DarkGray; $skipOtherMcp += $t.Tool }
+    }
+} else {
+    Write-Host "  (未找到 dist/server.js，Cursor/Kiro 的 MCP 注册跳过；先让 MCP 引擎构建成功)" -ForegroundColor DarkYellow
+}
+
 # --- 第 3 步：插件（claude plugin CLI 全自动；已安装跳过，更新交给 update skill）---
 Write-Host ""
 Write-Host "[3/3] 安装插件（claude plugin CLI，已安装跳过）..." -ForegroundColor Green
@@ -200,9 +260,10 @@ else {
 Write-Host ""
 Write-Host "==================== 安装结果 ====================" -ForegroundColor Cyan
 if ($newRepos.Count)   { Write-Host ("新克隆仓库 : " + ($newRepos -join ', ')) -ForegroundColor Green }
-if ($newMcp.Count)     { Write-Host ("新注册 MCP : " + ($newMcp -join ', ')) -ForegroundColor Green }
+if ($newMcp.Count)     { Write-Host ("新注册 MCP (Claude Code): " + ($newMcp -join ', ')) -ForegroundColor Green }
+if ($newOtherMcp.Count){ Write-Host ("新注册 MCP (其它工具): " + ($newOtherMcp -join ', ')) -ForegroundColor Green }
 if ($newPlugins.Count) { Write-Host ("新安装插件 : " + ($newPlugins -join ', ')) -ForegroundColor Green }
-if (-not ($newRepos.Count -or $newMcp.Count -or $newPlugins.Count)) {
+if (-not ($newRepos.Count -or $newMcp.Count -or $newOtherMcp.Count -or $newPlugins.Count)) {
     Write-Host "本次没有新安装项——全部已就绪。" -ForegroundColor Green
 }
 if ($haveRepos.Count -or $haveMcp.Count -or $havePlugins.Count) {

@@ -60,6 +60,11 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap-install.ps1
   - `cross-topology` → 跨项目拓扑（`cross-project-topology/knowledge`）
   
   两实例内容/生命周期分开，共用引擎二进制——`cross-project-topology` 自己**无需 build、无需 package.json**。
+- **MCP 多工具注册（Claude Code / Cursor / Kiro）**：同两个 MCP 实例会注册进多个 AI 工具——
+  - **Claude Code**：`claude mcp add`（第 2 步，CLI）。
+  - **Cursor**：写入 `%USERPROFILE%\.cursor\mcp.json`（第 2.5 步，仅当 `.cursor` 目录存在＝已装 Cursor）。
+  - **Kiro**：写入 `%USERPROFILE%\.kiro\settings\mcp.json`（同上，仅当 `.kiro` 存在）。
+  - 三者用**同一份 `dist/server.js` + `DOMAIN_KB_DIR`**，配置等价（`command: node` + `args` 指向 server.js + `env.DOMAIN_KB_DIR`）。写 JSON **幂等**：已有同名 server 跳过、不覆盖（更新走 update skill）。未装的工具自动跳过。Codex 暂未自动写入（其 MCP 配置格式后续补；可手动用同样的 command/args）。
 - **前提**：引擎只索引 frontmatter 含 `id` 的 .md。`cross-project-topology` 内容须放在 `knowledge/{生态}/{拓扑类型}/{id}.md`。若该仓库尚无 `knowledge/` 根目录，脚本会跳过 `cross-topology` 注册并提示——内容就绪后用 update skill 刷新即可。
 
 ## 前置检查
