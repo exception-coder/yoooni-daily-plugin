@@ -65,10 +65,14 @@ node pipeline.mjs status --name <系统>
 
 - **调用 `domain-knowledge-bootstrap` skill**(在 project-domain-knowledge 仓库),不在这里重写。
 - 流程:建 `knowledge/<project>/impl/modules.json`(模块→代码映射)→ `scan` 扫代码面 →
-  **人判边界**(哪些是业务真理)→ `new` 生成骨架 → 填口径 → `check` + `catalog`。
+  **人判边界**(哪些是业务真理)→ `new` 生成骨架 → 填口径 → `check` + `check-paths` + `catalog`。
+- **填 modules.json 后必跑 `check-paths` 校验**:codePath/webPaths 是否真实存在——
+  前端 `webPaths` 全靠人工填、最易写错(写了不存在的目录 / 漏真实业务目录 / 把单文件当模块);
+  一个后端模块前端常散在多个目录,`webPaths` 用数组列全。命令:
+  `node scripts/bootstrap.mjs check-paths --project <P> --backend-root <后端根> --frontend-root <前端根>`。
 - 优先用 **DDL/SQL 脚本**里的状态字典等作可信来源(比类名推断准,可直接 stable);
   纯推断的标注清楚、走评审。
-- **关卡**:模块怎么切、哪些进库、哪些升 stable。
+- **关卡**:模块怎么切、哪些进库、哪些升 stable、`check-paths` 必须全过(路径零失效)。
 - 完成 → `mark --stage knowledge`。
 
 ### ④ coding — 编码 profile [AI起草+人确认，调 project-coding-profiles]
@@ -110,7 +114,7 @@ node pipeline.mjs status --name <系统>
 
 | 阶段 | 调用 |
 |---|---|
-| ③ knowledge | domain-knowledge-bootstrap skill + bootstrap.mjs(gaps/scan/new/check) |
+| ③ knowledge | domain-knowledge-bootstrap skill + bootstrap.mjs(gaps/scan/new/check/check-paths) |
 | ④ coding | project-coding-profiles(profiles/ 登记) |
 | ⑤ aggregate | yoooni-taskspace skill(taskspace.mjs) |
 | ⑥ topology | cross-project-topology 仓库 |
