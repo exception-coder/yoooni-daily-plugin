@@ -1,5 +1,14 @@
 @echo off
 setlocal
+:: --- PATH self-heal (key) ---
+:: After freshly installing Git/Node/Claude WITHOUT a restart, this double-clicked
+:: process inherits the OLD PATH and reports already-installed tools as "missing"
+:: (claude is an npm-global command at %APPDATA%\npm; lands on PATH only after a new
+:: terminal / re-login). Append the 3 tools' default install dirs to THIS process PATH
+:: (only ones that actually exist) so the check does not raise false failures.
+if exist "%ProgramFiles%\nodejs" set "PATH=%PATH%;%ProgramFiles%\nodejs"
+if exist "%APPDATA%\npm" set "PATH=%PATH%;%APPDATA%\npm"
+if exist "%ProgramFiles%\Git\cmd" set "PATH=%PATH%;%ProgramFiles%\Git\cmd"
 title Company Team Tools - One-click Check
 echo ==================================================
 echo   Company Team Tools - One-click Check

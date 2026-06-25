@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Check whether the company Claude Code tool suite is installed and active.
 
@@ -13,6 +13,14 @@ param(
 $ErrorActionPreference = 'Continue'
 $script:FailedChecks = 0
 $script:WarnChecks = 0
+
+# --- PATH 兜底：claude 是 npm 全局命令（装在 %APPDATA%\npm），刚装完未重启时可能不在本进程 PATH。
+#     若此刻 claude 不可见但该目录存在，补进 PATH，避免"明明装了却全判找不到"的连锁误报
+#     （单这一项会引发 claude/3 插件/2 MCP 共 6 个 blocking 误报）。直接跑本 .ps1 时同样生效。
+$npmGlobalDir = Join-Path $env:APPDATA 'npm'
+if ((-not (Get-Command claude -ErrorAction SilentlyContinue)) -and (Test-Path -LiteralPath $npmGlobalDir)) {
+    $env:PATH = "$env:PATH;$npmGlobalDir"
+}
 
 $ExpectedPlugins = @(
     'yoooni-daily-plugin@yoooni-daily-plugin',

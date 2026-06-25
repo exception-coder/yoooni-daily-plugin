@@ -40,6 +40,13 @@ $cfg = Join-Path $env:USERPROFILE '.kai-toolbox\workspace.path'
 function Test-Cmd($n) { return [bool](Get-Command $n -ErrorAction SilentlyContinue) }
 function HasGitDir($d) { return ($d -and (Test-Path (Join-Path $d '.git'))) }
 
+# --- PATH 兜底：claude 是 npm 全局命令（装在 %APPDATA%\npm），刚装完未重启时可能不在本进程 PATH。
+#     若此刻 claude 不可见但该目录存在，补进 PATH，避免把"已装好的 claude"误判为缺失而跳过插件/MCP 安装。
+$npmGlobalDir = Join-Path $env:APPDATA 'npm'
+if ((-not (Test-Cmd claude)) -and (Test-Path -LiteralPath $npmGlobalDir)) {
+    $env:PATH = "$env:PATH;$npmGlobalDir"
+}
+
 # --- 前置检查 + 缺失项指引（同事自查用）---
 $hasGit = Test-Cmd git
 $hasNode = Test-Cmd node
