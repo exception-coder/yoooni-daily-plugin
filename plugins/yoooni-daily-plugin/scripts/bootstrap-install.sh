@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# PATH self-heal (macOS): Finder double-click runs with a minimal PATH that often omits
+# node / npm-global (where claude lives), so installed tools look missing. Prepend common
+# Homebrew + npm-global bins (harmless if a dir is absent). Mirrors the Windows .cmd fix.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.npm-global/bin:$PATH"
 # bootstrap-install.sh —— macOS/Linux「全新机器一键引导安装」（Gitee 源），对照 bootstrap-install.ps1。
 # 比 install-team-tools.sh 多做两件：(1) 克隆+安装本体 yoooni-daily-plugin；(2) 注册定时自动更新(launchd)。
 # 中间「关联插件 + MCP」委托 install-team-tools.sh（幂等、已装跳过）。

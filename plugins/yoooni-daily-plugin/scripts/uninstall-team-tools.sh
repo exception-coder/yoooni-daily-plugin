@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# PATH self-heal (macOS): Finder double-click runs with a minimal PATH that often omits
+# node / npm-global (where claude lives), so installed tools look missing. Prepend common
+# Homebrew + npm-global bins (harmless if a dir is absent). Mirrors the Windows .cmd fix.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.npm-global/bin:$PATH"
 # uninstall-team-tools.sh —— macOS/Linux「一键卸载」，对照 uninstall-team-tools.ps1。
 # 只摘本套件登记到 Claude Code 的项（白名单精确匹配），不碰其它插件/MCP：
 #   插件 team-standards / project-coding-profiles / yoooni-daily-plugin；MCP domain-knowledge / cross-topology；
