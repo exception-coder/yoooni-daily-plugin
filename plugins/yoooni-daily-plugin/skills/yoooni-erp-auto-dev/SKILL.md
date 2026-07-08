@@ -42,7 +42,9 @@ description: ERP 小需求自动开发编排——只给「模块名(中文名�
 
 - `domain-knowledge` MCP：`get_knowledge` / `search_knowledge` 拉该模块的业务口径、术语、状态机、字段含义。
 - 跨系统集成关系（若涉及）查 `cross-topology`。
-- **查库**：用授权通道取相关表结构、外键、**状态字典**（以 DDL/SQL 为准）；纯类名推断的点标注清楚。
+- **查库**：优先用只读工具 **`mcp__erp_db__query`**（工作台配置的测试库，**只读** SELECT）取相关表结构、外键、
+  **状态字典**、样本数据核对；也可参考仓内 DDL/SQL 脚本。以库/DDL 为准，纯类名推断的点标注清楚。
+  该工具若回「未配置」，提示用户到「ERP 需求开发」填测试库只读连接。
 - 汇总"这个需求涉及的业务真相与数据面"，供出方案用。
 
 ### ③ 出轻量方案 [半自动 · 关卡]
@@ -73,7 +75,7 @@ description: ERP 小需求自动开发编排——只给「模块名(中文名�
 | 步骤 | 调用 |
 |---|---|
 | ① 定位 | project-coding-profiles 的 `url-locate`（URL→代码）；`domain-knowledge` 模块映射（中文名→代码） |
-| ② 查真相 | `domain-knowledge` / `cross-topology` MCP + 授权 DB 查询 |
+| ② 查真相 | `domain-knowledge` / `cross-topology` MCP + `mcp__erp_db__query`（只读查测试库） |
 | ③ 方案 | team-standards 的 `design-doc-required` |
 | ④ 改码 | team-standards 的 `pre-implementation-code-orientation` + project-coding-profiles（encoding-guard / module-scaffold） |
 | ⑤ 提交 | 只改不提交；提交时走 team-standards 的 `git-commit-standards`（由人确认） |
