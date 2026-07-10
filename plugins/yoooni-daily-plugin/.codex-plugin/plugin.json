@@ -1,6 +1,6 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "description": "Yoooni daily-work toolbox: onboarding, SMB share fix, IDEA/Resin setup, daily startup, one-click install & fully-automatic update of the company plugins + MCP, production-log troubleshooting, cross-directory task spaces, and a hook-hit weekly report. Includes a SessionStart auto-update hook.",
   "author": {
     "name": "Zhang Kai",
@@ -43,8 +43,7 @@
     "defaultPrompt": [
       "我是新同事，怎么开始？",
       "安装公司团队工具。",
-      "启动 Yoooni 项目。",
-      "更新公司套件。"
+      "启动 Yoooni 项目。"
     ],
     "brandColor": "#0EA5E9"
   }

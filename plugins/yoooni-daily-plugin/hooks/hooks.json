@@ -1,5 +1,5 @@
 {
-  "_comment": "SessionStart hook：每次开 Claude Code 会话跑 session-autoupdate.js——每天最多一次在后台 git pull + 必要时重建公司 MCP 仓(project-domain-knowledge / cross-project-topology)，并把'插件有新版'提示带进上下文。非阻塞(重活在后台 detached 进程)。关闭 YOOONI_AUTOUPDATE=off；立即刷新 YOOONI_AUTOUPDATE=now。仅 Windows 执行后台刷新。另有一道 UserPromptSubmit hook：check-plugin-version-stale——每条 prompt 提交时比对本插件「当前会话已加载版本」与「磁盘最新版本」，磁盘更高即 stderr 提醒重启会话（三个团队插件各自检测、用会话级共享 flag ~/.kai-toolbox/.restart-reminded-<session> 原子去重不刷屏）；best-effort、绝不写 stdout、绝不阻断，YOOONI_VERSION_REMINDER=off 关闭。",
+  "description": "Codex and Claude Code hooks for daily team-tool updates and plugin-version checks.",
   "hooks": {
     "SessionStart": [
       {
