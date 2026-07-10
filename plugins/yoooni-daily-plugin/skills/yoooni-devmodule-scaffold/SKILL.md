@@ -20,6 +20,7 @@ description: 给某个项目在 kai-toolbox 工作台里生成一个「XX 需求
 - ❌ **不重造公共能力**：服务启停+日志一律用 `@/features/_devkit/DevServiceSection`（后端 `DevServiceController` 多实例底座，按 `serviceId` 键控），**不再抄一份**。
 - ❌ **路由组件必须 `React.lazy`**：kai-toolbox 靠代码分割，manifest 里页面必须 `lazy(() => import(...))`，不能静态 import（否则拖垮首屏，见 kai-toolbox `CLAUDE.md`）。
 - ❌ **配置落 SQLite，不落散 JSON**：需持久化的调试配置存 `claude_chat_setting` KV 表（`ClaudeChatSettingRepository`），照 `ErpDbConfigService`/`ErpAppConfigService` 范式；**不要**新建 `~/.kai-toolbox/*.json`。
+- ✅ **配置区按项目定制，对不上的 tool 就补新增对接**：调试配置区不是照抄 ERP 那两块，而是按目标项目技术栈填（库类型、实例鉴权方式各不同）。若复用的大脑现有 MCP 工具（`erp_db`=Oracle / `erp_app`=*.action）与目标项目对不上，**就补一套新对接**：后端 `<X>ConfigService`+`<X>Controller`+执行器（`/query` 或 `/call`）+ sidecar 新 MCP 工具（`sessionManager.ts` 里与 erp_* 并列注入）+ 触发语显式点名新工具名。新增 JDBC 驱动等依赖属关卡③。**不改团队大脑插件本体**（如 `yoooni-erp-auto-dev`），差异靠触发语点名新工具吸收。
 - ❌ **只改不提交**：改完出 diff 给人看，不 git add/commit/push。
 - ✅ **FeatureManifest 图标用组件引用**（Lucide 组件，非字符串）；`group` 归「AI 工具」，`layout` 默认 `tool`。
 - ✅ **先读范本**：动手前先读 `frontend/src/features/erp-dev/**` 与 kai-toolbox `CLAUDE.md`（架构·tool 插入约定），照着来。
@@ -65,10 +66,11 @@ description: 给某个项目在 kai-toolbox 工作台里生成一个「XX 需求
   - 调试配置区（若①有）：折叠 `<details>`，字段照 `ErpDbConfigSection` 写法，走后端 KV；
   - 「开始开发」：拼触发语写 `sessionStorage` handoff → 跳 Vibe Coding（照 `erp-dev` 的 `LAUNCH_KEY` 范式）。
 
-### ④ 生成后端配置（仅当①有调试配置）[半自动 · 关卡③]
+### ④ 生成后端配置 + 按需补对接（仅当①有调试配置）[半自动 · 关卡③]
 
-- 照 `ErpDbConfigService`/`ErpAppConfigService`：`<X>ConfigService`（KV 表 `claude_chat_setting`，name=模块 id，含密码留空保留、脱敏视图）+ `<X>Controller`（`/api/claude-chat/<id>/config` GET脱敏/PUT + test）。
-- **关卡③**：任何新增表/字段/迁移单独确认（本骨架优先用现成 `claude_chat_setting` KV，通常无需新表）。
+- 照 `ErpDbConfigService`/`ErpAppConfigService`：`<X>ConfigService`（KV 表 `claude_chat_setting`，name=模块前缀如 `srm-db`/`srm-app`，含密码留空保留、脱敏视图）+ `<X>Controller`（`/api/claude-chat/<name>/config` GET脱敏/PUT + test）。
+- **对不上就补新对接**：目标项目库/实例与 erp_db(Oracle)/erp_app(*.action) 不同则新写执行器 + sidecar MCP 工具（见红线「配置区按项目定制」）。查询/调用结果 DTO 可复用通用的 `ErpDbQueryResult`/`ErpAppCallResult`（非 ERP 专属，纯数据壳）。
+- **关卡③**：任何新增表/字段/迁移或新增 Maven/npm 依赖单独确认（本骨架优先用现成 `claude_chat_setting` KV，通常无需新表；新增 JDBC 驱动等依赖要念给用户）。
 
 ### ⑤ 自检 + 出 diff [自动 · 只改不提交]
 
@@ -99,3 +101,15 @@ tools/.../<X>ConfigService.java + <X>Controller.java   # （仅当有调试配�
 ## 首个落地：kai-toolbox 自身（dogfood）
 
 - 模块 id `kai-dev`、中文名「kai-toolbox 开发」；`defaultCommand` 前端 `npm run dev`（或后端 `mvn -pl toolbox-starter -am spring-boot:run`，二者可各配一个 serviceId）；调试配置项按需（多数无）；大脑可先复用通用门控口径。
+
+## 第二个落地：SRM 需求开发（补新对接 + 多服务启停的范例）
+
+- 模块 id `srm-dev`、中文名「SRM需求开发」、图标 `Handshake`；目标项目=芋道 Spring Cloud 微服务 + Vue2 前端 + MySQL（聚合工作区 `srm-system`，启停脚本在其根）。
+- **启停**：单块 `DevServiceSection serviceId="srm"`，`defaultCommand`/`stopCommand` 接聚合脚本 `start-srm.ps1 -Foreground`/`stop-srm.ps1`。
+  - ⚠️ **扇出型 launcher 陷阱**：若启动脚本用 `Start-Process` 把各服务甩到独立窗口后自身立刻返回（`exit=0`），devkit 的「一进程+抓 stdout+按存活判状态」模型会失配——工作台判「已退出」且抓不到任何日志。**解法（脚本适配，优先）**：给脚本加 `-Foreground` 合并前台模式——各服务作为**本进程真子进程**跑（`Start-Process -NoNewWindow` + 重定向临时文件），输出按 `[服务名]` 前缀**合并**打到本进程 stdout 并**阻塞**等待；停服对进程树整体 kill 即全带走。人肉多窗口默认不变。次选（工作台适配）：拆成多个单服务 `DevServiceSection`，但会把 JVM 参数/端口从脚本抄进前端、易漂移。
+  - 🟢 **多服务就绪可视化**：单窗口合并后「哪些子服务起好了」看不出来——给 `DevServiceSection` 传可选 `readinessPorts=[{label,port}...]`，它按 label 显示就绪徽标条，由 devkit 后端 `GET /api/claude-chat/dev-service/ports?ports=…`（本机 TCP 探端口，绕开浏览器直连后端端口的 CORS 限制）每 4s 判绿/灰。SRM 传了 gateway:8887/infra:8888/system:8889/frontend:81。此为 devkit 通用能力，任意模块可复用。
+- **配置区（对不上 → 补对接）**：erp_db 是 Oracle、erp_app 是 *.action，均与 SRM 不符，故新增：
+  - 后端 `SrmDbConfigService`+`SrmDbController`+`SrmDbService`（MySQL 只读，`jdbc:mysql`，复用 SELECT-only 闸 + `ErpDbQueryResult` DTO）；pom 加 `mysql-connector-j`（关卡③）。
+  - 后端 `SrmAppConfigService`+`SrmAppController`+`SrmAppService`（yudao OAuth2 密码登录取 `data.accessToken`，后续带 `Authorization: Bearer` + `tenant-id` 头；复用同源白名单 + 拒生产域 + `ErpAppCallResult` DTO）。
+  - sidecar `srmDb.ts`/`srmApp.ts` 暴露 `mcp__srm_db__query` / `mcp__srm_app__http_call`，`sessionManager.ts` 与 erp_* 并列注入。
+- **大脑**：复用 `yoooni-erp-auto-dev`（不改其本体），触发语按 SRM 改口径（domain-knowledge project=srm、前端 `src/api/<域>` ↔ 后端 `controller/admin/srm/<E>Controller`、MySQL DDL 为准、芋道分层），并显式点名 `mcp__srm_db__query`/`mcp__srm_app__http_call` 做自闭环验证。
