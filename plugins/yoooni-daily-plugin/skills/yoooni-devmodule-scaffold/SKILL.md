@@ -46,7 +46,7 @@ description: 给某个项目在 kai-toolbox 工作台里生成一个「XX 需求
 
 问清并复述确认：
 - **模块 id**（英文短横线，如 `kai-dev`）+ **中文名**（如「kai-toolbox 开发」）+ 侧边栏图标（Lucide 组件名）。
-- **启停**：`defaultCommand`（前台启动命令，如 `mvn -pl toolbox-starter -am spring-boot:run` 或 `npm run dev`）；`serviceId`（通常=模块 id）；有专用停服命令则给 `stopCommand`，否则默认结束进程树。
+- **启停**：`serviceId`（通常=模块 id）；`defaultCommand`（前台启动命令）**不强制用户给**——用户没填就**到项目根目录探索启停脚本**（常见 `start-*.ps1` / `stop-*.ps1`、`package.json` 的 scripts、`pom.xml`/`mvn`），识别出的启动/停服命令作为 `defaultCommand`/`stopCommand`，在关卡①念给用户确认；探索不到停服命令就默认结束进程树。
 - **调试必备配置**：这个项目跑起来/调试**必须**的配置项有哪些（DB？实例地址？账号密钥？没有就跳过配置区）。
 - **大脑**：复用 `yoooni-erp-auto-dev`（若也是 ERP 类），还是新建一个项目专属大脑 skill（另走 skill 编写）；先定触发语。
 - **关卡①**：以上念给用户确认，尤其"差异项到底差哪些"。
