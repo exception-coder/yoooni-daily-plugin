@@ -56,7 +56,7 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 
 | Skill 名 | 一句话描述 | 触发短语示例 |
 |---|---|---|
-| [yoooni-onboard-init](skills/yoooni-onboard-init/SKILL.md) | 入职初始化：SVN 拉取项目文档 | "入职初始化"、"拉一下项目文档"、"我是新同事怎么开始" |
+| [yoooni-onboard-init](skills/yoooni-onboard-init/SKILL.md) | 入职初始化：SVN 拉取公司项目文档 | “Yoooni 入职初始化”、“我是新同事”、“SVN 拉取 Yoooni 项目文档”；不匹配知识图谱初始化 |
 | [yoooni-smb-share-access](skills/yoooni-smb-share-access/SKILL.md) | 共享网络访问：修复 SMB，访问 \\IT01 | "连不上共享"、"访问 \\IT01"、"安全策略阻止来宾访问"、"修复 SMB" |
 | [yoooni-idea-import](skills/yoooni-idea-import/SKILL.md) | IDEA 导入 Yoooni：搭建 Resin 开发环境 | "导入 Yoooni 项目"、"IDEA 打开 Yoooni"、"配置 Resin"、"项目跑不起来" |
 | [yoooni-start](skills/yoooni-start/SKILL.md) | 日常启动：检查中间件(Redis/Oracle)并启动 | "启动 Yoooni"、"跑起来"、"起项目"、"本地起服务" |
@@ -72,7 +72,9 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 ### yoooni-onboard-init — 入职初始化
 
 **触发短语**：
-- "入职初始化" / "初始化环境" / "我是新同事，怎么开始"
+- “Yoooni 入职初始化” / “我是新同事，怎么开始入职”
+- “SVN checkout 公司项目文档” / “从 SVN 拉取 Yoooni 项目文档”
+- 不因泛化的“初始化环境/初始化项目文档/初始化知识图谱”触发
 - "拉一下项目文档" / "SVN checkout" / "拉取 Yoooni 文档"
 - "第一步做什么"
 
