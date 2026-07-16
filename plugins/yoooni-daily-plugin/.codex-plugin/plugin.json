@@ -1,6 +1,6 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "0.25.3",
+  "version": "0.25.4",
   "description": "Yoooni daily-work toolbox: onboarding, SMB share fix, IDEA/Resin setup, daily startup, one-click install & fully-automatic update of the company plugins + MCP, production-log troubleshooting, cross-directory task spaces, and a hook-hit weekly report. Includes a SessionStart auto-update hook.",
   "author": {
     "name": "Zhang Kai",

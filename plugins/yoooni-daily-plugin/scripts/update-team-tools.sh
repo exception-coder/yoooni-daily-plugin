@@ -21,11 +21,17 @@ done
 
 STATE_DIR="$HOME/.kai-toolbox"
 mkdir -p "$STATE_DIR"
+LOCK_DIR="$STATE_DIR/team-tools-update.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then exit 0; fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
 LOG="$STATE_DIR/team-tools-update.log"
 NOTICE="$STATE_DIR/team-tools-update.notice"
 CFG="$STATE_DIR/workspace.path"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG"; }
+log() {
+  if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 10485760 ]; then mv -f "$LOG" "$LOG.1"; fi
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG"
+}
 has() { command -v "$1" >/dev/null 2>&1; }
 toml_path() { printf '%s' "$1" | sed 's#\\#/#g; s#"#\\"#g'; }
 find_repo_dir() {
@@ -52,7 +58,10 @@ sync_codex_mcp_server() {
   [ -d "$codex_root" ] || { log "  codex: ~/.codex not found, skip MCP config"; return 0; }
   mkdir -p "$(dirname "$codex_cfg")"
   [ -f "$codex_cfg" ] || : > "$codex_cfg"
+  [ "$(wc -c < "$codex_cfg")" -le 16777216 ] || { log "  codex: config exceeds 16MB, refuse to modify"; return 1; }
   tmp="$codex_cfg.tmp.$$"
+  base="$tmp.base"
+  cp "$codex_cfg" "$base"
   awk -v name="$name" '
     /^\[/ {
       if ($0 == "[mcp_servers.\"" name "\"]" || $0 == "[mcp_servers." name "]") {
@@ -62,14 +71,17 @@ sync_codex_mcp_server() {
       skip = 0
     }
     !skip { print }
-  ' "$codex_cfg" > "$tmp"
+  ' "$base" > "$tmp"
   {
     printf '\n[mcp_servers."%s"]\n' "$name"
     printf 'command = "node"\n'
     printf 'args = ["%s"]\n' "$(toml_path "$entry")"
     printf 'env = { "DOMAIN_KB_DIR" = "%s" }\n' "$(toml_path "$kb")"
   } >> "$tmp"
+  if ! cmp -s "$base" "$codex_cfg"; then rm -f "$tmp" "$base"; log "  codex: config changed concurrently, refuse to overwrite"; return 1; fi
+  cp "$base" "$codex_cfg.yoooni-safe.bak"
   mv "$tmp" "$codex_cfg"
+  rm -f "$base"
   log "  codex: MCP config synced -> $name"
 }
 sync_json_mcp_config() {
@@ -139,7 +151,7 @@ function rev(repo) {
 }
 function tableRegex(kind, key) {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`^\\[${kind}\\.${kind === 'plugins' ? '"' : ''}${escaped}${kind === 'plugins' ? '"' : ''}\\]\\s*\\r?\\n.*?(?=^\\[|\\z)`, 'ms');
+  return new RegExp(`^\\[${kind}\\.${kind === 'plugins' ? '"' : ''}${escaped}${kind === 'plugins' ? '"' : ''}\\]\\s*\\r?\\n.*?(?=^\\[|(?![\\s\\S]))`, 'ms');
 }
 function putBlock(text, regex, block) {
   if (regex.test(text)) return text.replace(regex, block.trimStart());
@@ -148,6 +160,8 @@ function putBlock(text, regex, block) {
 }
 fs.mkdirSync(path.dirname(configPath), { recursive: true });
 let text = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : '';
+if (Buffer.byteLength(text, 'utf8') > 16 * 1024 * 1024) throw new Error('Refuse to modify Codex config larger than 16MB');
+const originalText = text;
 const synced = [];
 for (const p of plugins) {
   const manifestPath = path.join(p.dir, '.codex-plugin', 'plugin.json');
@@ -157,18 +171,33 @@ for (const p of plugins) {
   const target = path.resolve(cacheRoot, p.marketplace, p.name, version);
   const cacheAbs = path.resolve(cacheRoot);
   if (!target.startsWith(cacheAbs + path.sep)) throw new Error(`Refuse to write outside cache: ${target}`);
-  fs.rmSync(target, { recursive: true, force: true });
+  const staging = `${target}.staging.${process.pid}`;
+  fs.rmSync(staging, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.cpSync(p.dir, target, { recursive: true });
+  fs.cpSync(p.dir, staging, { recursive: true });
+  if (!fs.existsSync(path.join(staging, '.codex-plugin', 'plugin.json'))) throw new Error(`Invalid staged plugin: ${staging}`);
+  fs.rmSync(target, { recursive: true, force: true });
+  fs.renameSync(staging, target);
   const updated = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
   const marketBlock = `\n[marketplaces.${p.marketplace}]\nlast_updated = "${updated}"\n${rev(p.repo) ? `last_revision = "${rev(p.repo)}"\n` : ''}source_type = "git"\nsource = "${p.url}"\n`;
   const pluginRef = `${p.name}@${p.marketplace}`;
   const pluginBlock = `\n[plugins."${pluginRef}"]\nenabled = true\n`;
-  text = putBlock(text, tableRegex('marketplaces', p.marketplace), marketBlock);
+  const marketRegex = tableRegex('marketplaces', p.marketplace);
+  const currentMarket = text.match(marketRegex)?.[0] || '';
+  const stable = (value) => value.replace(/^last_updated\s*=.*\r?\n?/m, '').trim();
+  if (!currentMarket || stable(currentMarket) !== stable(marketBlock)) text = putBlock(text, marketRegex, marketBlock);
   text = putBlock(text, tableRegex('plugins', pluginRef), pluginBlock);
   synced.push(`${pluginRef}@${version}`);
 }
-fs.writeFileSync(configPath, text);
+if (text !== originalText) {
+  const tmp = `${configPath}.tmp.${process.pid}`;
+  const backup = `${configPath}.yoooni-safe.bak`;
+  fs.writeFileSync(tmp, text, 'utf8');
+  const currentText = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : '';
+  if (currentText !== originalText) { fs.rmSync(tmp, { force: true }); throw new Error('Codex config changed concurrently; refusing to overwrite'); }
+  if (fs.existsSync(configPath)) fs.copyFileSync(configPath, backup);
+  fs.renameSync(tmp, configPath);
+}
 console.log(synced.join(','));
 NODE
   log "  codex: plugin sync complete"

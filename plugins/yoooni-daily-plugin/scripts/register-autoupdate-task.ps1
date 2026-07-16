@@ -14,6 +14,7 @@ $ErrorActionPreference = 'Continue'
 $taskName = 'YoooniTeamToolsAutoUpdate'
 $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($OnlyIfExists -and -not $existing) { return }   # 自愈：从未注册过就不创建
+$wasDisabled = $existing -and $existing.State -eq 'Disabled'
 
 $state = Join-Path $env:USERPROFILE '.kai-toolbox'
 New-Item -ItemType Directory -Force -Path $state | Out-Null
@@ -48,6 +49,7 @@ if ($correct) {
 } else {
   schtasks /Create /TN $taskName /TR $tr /SC HOURLY /MO $EveryHours /F | Out-Null
   if ($LASTEXITCODE -eq 0) {
+    if ($wasDisabled) { Disable-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Out-Null }
     Write-Host "Registered '$taskName' (every $EveryHours h, hidden via VBS) -> $launcher" -ForegroundColor Green
   } else {
     Write-Warning "schtasks create failed (exit $LASTEXITCODE). Run this script in your own terminal."

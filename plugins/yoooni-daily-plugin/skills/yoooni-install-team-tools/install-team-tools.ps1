@@ -31,9 +31,36 @@ param(
 $ErrorActionPreference = 'Continue'
 $utf8 = New-Object System.Text.UTF8Encoding($false)   # 无 BOM
 $cfg  = Join-Path $env:USERPROFILE '.kai-toolbox\workspace.path'
+$maxCodexConfigBytes = 16MB
 
 function Test-Cmd($name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
 function HasPdk($w) { return ($w -and (Test-Path (Join-Path $w 'project-domain-knowledge\.git'))) }
+
+function Read-CodexConfigUtf8($configPath) {
+    if (-not (Test-Path -LiteralPath $configPath)) { return '' }
+    $size = (Get-Item -LiteralPath $configPath).Length
+    if ($size -gt $maxCodexConfigBytes) {
+        throw "Refuse to read oversized Codex config ($size bytes; limit $maxCodexConfigBytes): $configPath"
+    }
+    $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+    return $strictUtf8.GetString([IO.File]::ReadAllBytes($configPath))
+}
+
+function Write-CodexConfigUtf8($configPath, $text, $expectedText) {
+    $dir = Split-Path $configPath
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    $tmp = Join-Path $dir (".{0}.{1}.tmp" -f (Split-Path $configPath -Leaf), [guid]::NewGuid().ToString('N'))
+    $backup = "$configPath.yoooni-safe.bak"
+    try {
+        [IO.File]::WriteAllText($tmp, $text, $utf8)
+        $null = (New-Object System.Text.UTF8Encoding($false, $true)).GetString([IO.File]::ReadAllBytes($tmp))
+        if ((Get-Item $tmp).Length -gt $maxCodexConfigBytes) { throw "Refuse to write oversized Codex config: $tmp" }
+        if ((Read-CodexConfigUtf8 $configPath) -ne $expectedText) { throw "Codex config changed concurrently; refusing to overwrite: $configPath" }
+        if (Test-Path $configPath) { [IO.File]::Replace($tmp, $configPath, $backup, $true) }
+        else { [IO.File]::Move($tmp, $configPath) }
+    }
+    finally { if (Test-Path $tmp) { Remove-Item -LiteralPath $tmp -Force } }
+}
 
 # 幂等把若干 MCP server 写进某 AI 工具的 mcpServers JSON 配置(Cursor / Kiro 同格式)。
 #   - 工具根目录不存在 => 视为未安装,返回 $null(跳过)。
@@ -68,7 +95,7 @@ function Add-McpToJsonConfig($toolRoot, $configPath, $servers) {
 function Add-McpToTomlConfig($codexRoot, $configPath, $servers) {
     if (-not (Test-Path $codexRoot)) { return $null }   # 未装 Codex
     $existing = ''
-    if (Test-Path $configPath) { $existing = (Get-Content $configPath -Raw -ErrorAction SilentlyContinue) }
+    $existing = Read-CodexConfigUtf8 $configPath
     if ($null -eq $existing) { $existing = '' }
     $added = @()
     $append = ''
@@ -90,7 +117,7 @@ function Add-McpToTomlConfig($codexRoot, $configPath, $servers) {
     }
     if ($append) {
         $sep = if ($existing -and -not $existing.EndsWith("`n")) { "`n" } else { '' }
-        [IO.File]::WriteAllText($configPath, $existing + $sep + $append, $utf8)
+        Write-CodexConfigUtf8 $configPath ($existing + $sep + $append) $existing
     }
     return $added
 }
@@ -153,7 +180,7 @@ function New-CodexPluginBlock($pluginRef) {
 function Sync-CodexPlugins($codexRoot, $configPath, $plugins) {
     if (-not (Test-Path $codexRoot)) { return $null }
     $existing = ''
-    if (Test-Path $configPath) { $existing = (Get-Content $configPath -Raw -ErrorAction SilentlyContinue) }
+    $existing = Read-CodexConfigUtf8 $configPath
     if ($null -eq $existing) { $existing = '' }
 
     $text = $existing
@@ -178,9 +205,12 @@ function Sync-CodexPlugins($codexRoot, $configPath, $plugins) {
         if (-not $cacheDir.StartsWith($cacheRoot, [StringComparison]::OrdinalIgnoreCase)) {
             throw "Refuse to write outside Codex plugin cache: $cacheDir"
         }
-        if (Test-Path $cacheDir) { Remove-Item -LiteralPath $cacheDir -Recurse -Force }
+        $stagingDir = "$cacheDir.staging.$([guid]::NewGuid().ToString('N'))"
         New-Item -ItemType Directory -Force -Path (Split-Path $cacheDir) | Out-Null
-        Copy-Item -LiteralPath $p.PluginDir -Destination $cacheDir -Recurse -Force
+        Copy-Item -LiteralPath $p.PluginDir -Destination $stagingDir -Recurse -Force
+        if (-not (Test-Path (Join-Path $stagingDir '.codex-plugin\plugin.json'))) { throw "Invalid staged Codex plugin: $stagingDir" }
+        if (Test-Path $cacheDir) { Remove-Item -LiteralPath $cacheDir -Recurse -Force }
+        Move-Item -LiteralPath $stagingDir -Destination $cacheDir
         $cached += ("{0}@{1}" -f $p.Name, $version)
 
         $revision = Get-GitRevision $p.RepoDir
@@ -188,7 +218,17 @@ function Sync-CodexPlugins($codexRoot, $configPath, $plugins) {
         $pluginRef = "{0}@{1}" -f $p.Name, $p.Marketplace
         $pluginPattern = '(?ms)^\[plugins\."' + [regex]::Escape($pluginRef) + '"\]\s*\r?\n.*?(?=^\[|\z)'
         $changed = $false
-        $text = Sync-TomlTableBlock $text $marketPattern (New-CodexMarketplaceBlock $p.Marketplace $p.Url $revision) ([ref]$changed)
+        $marketBlock = New-CodexMarketplaceBlock $p.Marketplace $p.Url $revision
+        if ($text -match $marketPattern) {
+            $currentStable = [regex]::Replace($Matches[0], '(?m)^last_updated\s*=.*\r?\n?', '')
+            $nextStable = [regex]::Replace($marketBlock, '(?m)^last_updated\s*=.*\r?\n?', '')
+            if ($currentStable.Trim() -ne $nextStable.Trim()) {
+                $text = Sync-TomlTableBlock $text $marketPattern $marketBlock ([ref]$changed)
+            }
+        }
+        else {
+            $text = Sync-TomlTableBlock $text $marketPattern $marketBlock ([ref]$changed)
+        }
         $text = Sync-TomlTableBlock $text $pluginPattern (New-CodexPluginBlock $pluginRef) ([ref]$changed)
         $configured += $pluginRef
     }
@@ -196,7 +236,7 @@ function Sync-CodexPlugins($codexRoot, $configPath, $plugins) {
     if ($text -ne $existing) {
         $dir = Split-Path $configPath
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
-        [IO.File]::WriteAllText($configPath, $text, $utf8)
+        Write-CodexConfigUtf8 $configPath $text $existing
     }
 
     return [pscustomobject]@{ Configured = $configured; Cached = $cached; Skipped = $skipped }
