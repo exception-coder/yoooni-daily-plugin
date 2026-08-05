@@ -1,11 +1,11 @@
 ---
 name: yoooni-onboard-pipeline
-description: 新项目一键初始化流水线——拉项目→项目画像/CLAUDE.md→业务知识图谱→编码profile→前后端聚合→跨项目拓扑,把公司这套 onboarding 作业编排成一条可断点续跑的流水线。当用户说"初始化新项目"、"一键 onboard"、"接入一个新系统"、"把某项目拉起来建知识图谱和规范"、"项目初始化流水线"、"工作台初始化作业"时触发。编排已有能力(domain-knowledge-bootstrap / project-coding-profiles / yoooni-taskspace),机械步骤自动跑,需判断的节点设人工关卡,不做无人值守黑盒。
+description: 新项目一键初始化流水线——拉项目→项目画像/Agent入口（Claude Code 用 CLAUDE.md，Codex/Cursor 用 AGENTS.md）→业务知识图谱→编码profile→前后端聚合→跨项目拓扑,把公司这套 onboarding 作业编排成一条可断点续跑的流水线。当用户说"初始化新项目"、"一键 onboard"、"接入一个新系统"、"把某项目拉起来建知识图谱和规范"、"项目初始化流水线"、"工作台初始化作业"时触发。编排已有能力(domain-knowledge-bootstrap / project-coding-profiles / yoooni-taskspace),机械步骤自动跑,需判断的节点设人工关卡,不做无人值守黑盒。
 ---
 
 # 新项目初始化流水线 Skill
 
-把公司「接入一个新项目」的全套作业编排成一条流水线:**拉项目 → 画像/CLAUDE.md → 业务知识图谱 → 编码 profile → 前后端聚合 → 跨项目拓扑**。
+把公司「接入一个新项目」的全套作业编排成一条流水线:**拉项目 → 画像/Agent 入口 → 业务知识图谱 → 编码 profile → 前后端聚合 → 跨项目拓扑**。
 
 **定位**:编排器,不是黑盒。机械步骤(clone/聚合/建骨架)自动跑;需判断的节点(模块切分、技术栈、stable 与否、集成关系)停下来让人/AI 决策。复用已有能力,不重造。
 
@@ -54,10 +54,11 @@ node pipeline.mjs status --name <系统>
 - `plan` 会探测每个仓角色与栈。**关卡**:跟用户确认哪个是后端/前端、是否同属一个系统。
 - 完成 → `mark --stage fetch`。
 
-### ② profile(画像)— 项目画像 + CLAUDE.md [AI起草+人确认]
+### ② profile(画像)— 项目画像 + Agent 入口 [AI起草+人确认]
 
 - AI 读顶层/包结构/配置/构建文件,识别技术栈、分层、**编码(GBK?UTF-8?)**、启动方式。
-- 前后端分离 → **每个仓各写一份自包含的 `CLAUDE.md` 且互相指向**;不要只写一份。
+- 按 `domain-knowledge-bootstrap` 的入口选择规则维护：Claude Code 用 `CLAUDE.md`，Codex/Cursor 用 `AGENTS.md`，多工具团队双写同步。
+- 前后端分离 → **每个仓各写自包含的适用 Agent 入口且互相指向**;不要只在其中一个仓写一份。
 - **关卡**:技术栈识别对不对、编码判定对不对(GBK 项目要警示乱码,UTF-8 不必)。
 - 完成 → `mark --stage profile`。
 
@@ -87,7 +88,7 @@ node pipeline.mjs status --name <系统>
 ### ⑤ aggregate — 前后端聚合 [自动，调 yoooni-taskspace]
 
 - 仅前后端分离/多仓系统需要。`pipeline.mjs aggregate` 内部调 yoooni-taskspace 建 junction 工作区。
-- 顶层再写一份**系统级 CLAUDE.md**(全景 + 前后端对接关系),与 `.taskspace.json` 同级。
+- 顶层再按入口选择规则写**系统级 Agent 入口**(全景 + 前后端对接关系),与 `.taskspace.json` 同级。
 - 聚合工作区是本地视图,**通常不进 git**。
 - 完成 → `mark --stage aggregate`(单仓项目可 `--status skipped`)。
 
@@ -102,8 +103,8 @@ node pipeline.mjs status --name <系统>
 
 - `pipeline.mjs status` 出总进度。
 - 各产物分别提交到**各自的仓**(知识图谱→domain-knowledge / profile→coding-profiles /
-  CLAUDE.md→各项目仓),走 team-standards 的 git-commit-standards;聚合工作区不提交。
-- 汇总:本次 onboard 了哪个系统、产出多少知识点/哪些 profile/几份 CLAUDE.md。
+  CLAUDE.md/AGENTS.md→各项目仓),走 team-standards 的 git-commit-standards;聚合工作区不提交。
+- 汇总:本次 onboard 了哪个系统、产出多少知识点/哪些 profile/几份 Agent 入口文件。
 
 ## 工作台一键
 

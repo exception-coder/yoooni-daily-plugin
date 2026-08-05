@@ -1,7 +1,7 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "0.25.5",
-  "description": "Yoooni daily-work toolbox: onboarding, SMB share fix, IDEA/Resin setup, daily startup, one-click install & fully-automatic update of the company plugins + MCP, production-log troubleshooting, cross-directory task spaces, and a hook-hit weekly report. Includes a SessionStart auto-update hook.",
+  "version": "0.26.0",
+  "description": "Yoooni daily-work toolbox for Claude Code and Codex: 13 skills including the domain-knowledge bootstrap entry, onboarding pipeline, environment setup, team-tool lifecycle, production-log troubleshooting, task spaces, and hook reporting. Includes a SessionStart auto-update hook.",
   "author": {
     "name": "Zhang Kai",
     "email": "ping.yang@kpay-group.com"

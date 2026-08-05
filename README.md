@@ -1,6 +1,6 @@
 # yoooni-daily-plugin
 
-Yoooni 团队日常工作 Claude Code 插件。包含 **10 个 Skill** + **SessionStart 自动更新 hook**（每日后台刷新公司 MCP 仓），后续按需扩展。
+Yoooni 团队日常工作 Claude Code / Codex 插件。包含 **13 个 Skill** + **SessionStart 自动更新 hook**（每日后台刷新公司 MCP 仓），后续按需扩展。
 
 ## 快速开始（60 秒）
 
@@ -65,7 +65,8 @@ yoooni-onboard-init → yoooni-smb-share-access → yoooni-idea-import   →  yo
 | [yoooni-prod-log-query](skills/yoooni-prod-log-query/SKILL.md) | 查生产后台接口注册日志（apiRegistrylog）排查线上 | "查生产日志"、"查接口日志"、"排查线上 XX 接口"、"apiRegistrylog" |
 | [yoooni-taskspace](skills/yoooni-taskspace/SKILL.md) | 跨目录任务空间：选择多个项目并用链接聚合到一个工作区 | "创建任务空间"、"合并几个项目"、"一键选择创建软链接"、"taskspace" |
 | [yoooni-hook-report](skills/yoooni-hook-report/SKILL.md) | hook 命中周报：聚合 \\IT01 共享里的 warn hook 命中事件出统计，定升不升 block | "hook 命中周报"、"规则命中排行"、"大家踩了哪些规范"、"哪条规则该升 block" |
-| [yoooni-onboard-pipeline](skills/yoooni-onboard-pipeline/SKILL.md) | 新项目初始化流水线：拉项目→画像/CLAUDE.md→知识图谱→编码profile→前后端聚合→跨项目拓扑，编排已有能力、机械步自动跑、判断点设人工关卡 | "初始化新项目"、"一键 onboard"、"接入一个新系统"、"项目初始化流水线"、"工作台初始化作业" |
+| [yoooni-onboard-pipeline](skills/yoooni-onboard-pipeline/SKILL.md) | 新项目初始化流水线：拉项目→画像/Agent 入口→知识图谱→编码profile→前后端聚合→跨项目拓扑，编排已有能力、机械步自动跑、判断点设人工关卡 | "初始化新项目"、"一键 onboard"、"接入一个新系统"、"项目初始化流水线"、"工作台初始化作业" |
+| [domain-knowledge-bootstrap](skills/domain-knowledge-bootstrap/SKILL.md) | Codex / Claude 的业务真理初始化入口；转交到 project-domain-knowledge 中的唯一规范正文 | "domain-knowledge-bootstrap"、"起草业务真理"、"按模块生成 draft" |
 
 ## Skills 详细说明
 
@@ -226,6 +227,19 @@ SVN 地址：`http://47.115.158.133:22/svn/yoooni/Yoooni/项目文档`
 
 详见 [skills/yoooni-hook-report/SKILL.md](skills/yoooni-hook-report/SKILL.md)
 
+### domain-knowledge-bootstrap — 业务真理初始化
+
+**触发短语**：
+- "domain-knowledge-bootstrap" / "起草业务真理"
+- "按模块扫描并生成 draft" / "初始化项目画像与 domain knowledge"
+
+**核心功能**：
+- 作为 Codex / Claude 可发现的分发入口，定位 C 盘团队工具目录中的 `project-domain-knowledge`
+- 完整读取并执行权威 `domain-knowledge-bootstrap` 流程，不复制第二套规范
+- Claude Code 产出 `CLAUDE.md`，Codex / Cursor 产出 `AGENTS.md`，多工具项目同步维护双入口
+
+详见 [skills/domain-knowledge-bootstrap/SKILL.md](skills/domain-knowledge-bootstrap/SKILL.md)
+
 ## 目录结构
 
 ```
@@ -234,6 +248,8 @@ yoooni-daily-plugin/
 │   ├── plugin.json          # 插件主 manifest
 │   └── marketplace.json     # 市场分发配置
 ├── skills/
+│   ├── domain-knowledge-bootstrap/ # Codex / Claude 业务真理初始化分发入口
+│   │   └── SKILL.md
 │   ├── yoooni-onboard-init/   # 入职初始化 skill
 │   │   └── SKILL.md
 │   ├── yoooni-smb-share-access/ # 共享网络访问 skill（修复 SMB / 访问 IT01）
