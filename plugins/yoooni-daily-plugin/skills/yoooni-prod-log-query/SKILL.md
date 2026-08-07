@@ -1,6 +1,6 @@
 ---
 name: yoooni-prod-log-query
-description: 查询 Yoooni 生产后台「接口注册日志」(apiRegistrylog) 排查线上问题。当用户说"查生产日志"、"查接口日志"、"排查线上接口"、"看看生产后台某接口的调用记录"、"apiRegistrylog"、"查某个方法/url 的生产请求"、"线上这个接口报错查一下"时触发。通过生产后台 https://wyoooni.net/sys/apiRegistrylog_list.action 按日期/接口名/url方法/内容/启用状态过滤查询。用【账号密码】自动登录拿会话（不再手工复制 cookie），账号密码存用户主目录配置文件。
+description: 查询 Yoooni 生产后台 apiRegistrylog。用户要求按接口、URL、方法或日期查看生产调用记录、排查线上接口问题时使用。
 ---
 
 # Yoooni 生产日志查询 Skill

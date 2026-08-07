@@ -1,6 +1,6 @@
 ---
 name: yoooni-hook-report
-description: 出一份「团队 vibecoding 周报」——两部分：①hook 命中统计(用数据决定某条 warn 规则要不要升 block、谁常踩)；②对 AI 的疑问/纠正规整(把同事反复问的业务、反复纠正 AI 的点，LLM 归纳成"业务缺口 → 该补什么知识库/术语/规范/提示词")。当用户说"hook 命中周报"、"规则命中排行"、"哪条规则该升 block"、"warn 统计"、"疑问纠正周报"、"大家常问什么业务"、"该补什么知识/规范"、"prompt 信号统计"、"看看 vibecoding 日志"时触发。数据来自公司共享 \\IT01\版本更新\vibecoding（hook-events-*.jsonl + prompt-signals-*.jsonl，由 team-standards / project-coding-profiles 的 hook 本地登记、update-team-tools.ps1 best-effort 同步）。需能访问 \\IT01 共享。
+description: 生成团队 vibecoding 周报。用户要求 hook 命中排行、warn 升级分析、疑问纠正归纳或 prompt 信号统计时使用；数据来自 IT01 共享。
 ---
 
 # 团队 vibecoding 周报

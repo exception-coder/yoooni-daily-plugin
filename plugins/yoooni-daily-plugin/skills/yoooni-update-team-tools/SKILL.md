@@ -1,6 +1,6 @@
 ---
 name: yoooni-update-team-tools
-description: 更新/同步公司团队套件（插件 + MCP），以及开启/管理自动更新。当用户说"更新公司套件 / 更新团队工具 / 刷新插件和MCP / 同步最新规范 / 团队工具有没有新版 / 开启自动更新 / 装个定时自动更新 / 关掉自动更新 / update team tools"时触发。也是 SessionStart 自动更新（每日后台 git pull + 重建 MCP 仓 + 自动更新插件）的手动入口与开关说明。MCP 仓与插件（team-standards / project-coding-profiles / yoooni-daily-plugin）现均可全自动同步——插件走 `claude plugin` CLI（marketplace update + plugin update），脚本/计划任务可代劳，无需手敲 slash；插件更新后重启会话生效。
+description: 用于更新或同步公司插件与 MCP，以及开启、关闭或检查定时自动更新。用户要求刷新团队工具或最新规范时使用。
 ---
 
 # 更新公司团队套件（AI 自动维护）

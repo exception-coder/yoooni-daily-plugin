@@ -1,6 +1,6 @@
 ---
 name: yoooni-onboard-pipeline
-description: 新项目一键初始化流水线——拉项目→项目画像/Agent入口（Claude Code 用 CLAUDE.md，Codex/Cursor 用 AGENTS.md）→业务知识图谱→编码profile→前后端聚合→跨项目拓扑,把公司这套 onboarding 作业编排成一条可断点续跑的流水线。当用户说"初始化新项目"、"一键 onboard"、"接入一个新系统"、"把某项目拉起来建知识图谱和规范"、"项目初始化流水线"、"工作台初始化作业"时触发。编排已有能力(domain-knowledge-bootstrap / project-coding-profiles / yoooni-taskspace),机械步骤自动跑,需判断的节点设人工关卡,不做无人值守黑盒。
+description: 用于新项目一键 onboarding：拉取项目、生成 Agent 入口、业务知识、编码画像和跨项目拓扑。用户要求初始化新系统或项目流水线时使用。
 ---
 
 # 新项目初始化流水线 Skill

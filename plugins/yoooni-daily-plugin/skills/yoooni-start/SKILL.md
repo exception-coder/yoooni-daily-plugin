@@ -1,6 +1,6 @@
 ---
 name: yoooni-start
-description: 日常启动 Yoooni 项目（已搭好环境后每天用）。当用户说"启动 Yoooni / 跑起来 / 起项目 / 本地起服务 / 启动开发环境 / start yoooni / 项目怎么启动"时触发。先提醒用户在 Yoooni 项目根目录下运行；若当前目录不是项目根（没有 start-yoooni.ps1），就让用户填写项目根路径（绝不在磁盘乱搜）。再检查本地必备中间件 Redis（默认 127.0.0.1:6379，没在跑就按默认路径启动；找不到 redis-server 时问用户），预检远程 Oracle 连通性，最后跑项目根的 start-yoooni.ps1 启动 Resin 并给出访问地址。与首次环境搭建的 yoooni-idea-import 区分——本 skill 只管"启动"，不重复搭建。
+description: 用于已完成环境搭建后的 Yoooni 日常启动，包括检查 Redis、Oracle 连通性并运行 start-yoooni.ps1；不用于首次环境搭建。
 ---
 
 # Yoooni 日常启动

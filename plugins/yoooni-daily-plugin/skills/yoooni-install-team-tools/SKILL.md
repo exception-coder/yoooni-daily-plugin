@@ -1,6 +1,6 @@
 ---
 name: yoooni-install-team-tools
-description: 一键拉取并安装公司团队工具（全部走 Gitee 源）。当用户说"安装公司插件/MCP"、"拉一下团队工具"、"装 team-standards / project-coding-profiles / project-domain-knowledge / cross-project-topology"、"配置公司开发规范插件"、"一键安装团队规范"、"新机器装一下团队插件"时触发。覆盖：两个 Claude Code 插件（team-standards 编码规范、project-coding-profiles 编码画像）+ 两个 MCP 实例（同一引擎：domain-knowledge 业务认知 + cross-topology 跨项目拓扑）。脚本全自动（仓库 git clone + MCP 注册 + 插件 claude plugin CLI 安装），已安装的一律跳过、不重装、不更新——若检测到已安装，改用『更新公司套件』skill(yoooni-update-team-tools)。公司当前用 Gitee 管理源码，安装地址一律用 Gitee。全新机器用 scripts/bootstrap-install.ps1 一键引导（含本体 yoooni-daily-plugin 自身 + 定时自动更新注册），已装本体的机器才用 install-team-tools.ps1。
+description: 用于从 Gitee 一键安装公司团队插件和 MCP。用户要求在新机器安装、配置或拉取 team-standards 等团队工具时使用；已安装场景改用更新能力。
 ---
 
 # 一键安装公司团队工具 Skill（首次安装专用）

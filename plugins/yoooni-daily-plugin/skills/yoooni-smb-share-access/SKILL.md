@@ -1,6 +1,6 @@
 ---
 name: yoooni-smb-share-access
-description: 当用户访问内网共享 \\IT01（或 \\IT01\版本更新）失败时触发。典型场景：访问时弹"输入网络凭据"提示用户名或密码不正确、"连不上共享"、"网络共享打不开"、"提示组织安全策略阻止未经身份验证的来宾访问"、"SMB 来宾/Guest 访问被禁"、"修复 SMB"。一键以管理员运行 apply_smb_guest_it01.ps1（导入注册表开启不安全 Guest 登录、关闭 SMB 签名、重启 Workstation 服务、清旧会话、自测并列出共享），再引导用 guest 账号空密码访问 \\IT01。一般无需重启电脑。
+description: 当用户无法访问 IT01 共享，遇到网络凭据、Guest 登录或 SMB 安全策略错误，或明确要求修复 SMB 时使用。
 ---
 
 # Yoooni 内网共享 IT01 免密访问处理流程

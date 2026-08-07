@@ -1,7 +1,7 @@
 {
   "name": "yoooni-daily-plugin",
   "description": "Yoooni 日常工作 Claude Code / Codex 插件：13 个 Skill（含业务真理初始化的 Codex / Claude 分发入口、新项目初始化流水线、ERP 小需求自动开发、开发模块脚手架、入职与日常工具、团队套件安装更新、生产日志查询、跨目录任务空间和 hook 命中周报）+ SessionStart 自动更新 hook。",
-  "version": "0.26.0",
+  "version": "0.26.1",
   "author": {
     "name": "张凯",
     "email": "ping.yang@kpay-group.com"

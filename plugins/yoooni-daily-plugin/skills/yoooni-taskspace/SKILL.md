@@ -1,6 +1,6 @@
 ---
 name: yoooni-taskspace
-description: 创建跨目录任务空间，把多个项目目录聚合到一个新工作区。当用户说"创建任务空间"、"合并几个项目"、"几个大目录下的项目放到一个工作区"、"一键选择创建软链接"、"taskspace"、"junction 聚合工作区"时触发。使用本 skill 自带的 taskspace.mjs，在 Windows 上创建 junction，在 macOS/Linux 上创建目录 symlink；支持 create/list/add/remove/teardown，拆除时只删除链接和清单，不删除源项目。
+description: 用于创建、查看、扩展或拆除跨目录任务空间，通过 junction 或 symlink 将多个项目聚合到一个工作区且不删除源项目。
 ---
 
 # 跨目录任务空间 Skill

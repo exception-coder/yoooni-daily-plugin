@@ -1,6 +1,6 @@
 ---
 name: yoooni-idea-import
-description: 入职初始化相关——当新同事要把 Yoooni 项目导入 IDEA、搭建本地开发/运行环境，或说"导入 Yoooni 项目"、"IDEA 怎么打开 Yoooni"、"配置 Resin"、"项目跑不起来 / 启动不了"、"搭建 Yoooni 开发环境"、"WebRoot/WEB-INF 怎么放"、"resin.xml 怎么配"时触发。基于内网共享 \\IT01\版本更新\安装包\IDEA导入Yoooni项目 的官方文档，引导完成目录结构搭建、lib/IDEA 配置拷贝、Resin4 安装与配置、启动调试。需先能访问 IT01 共享。
+description: 用于新同事导入 Yoooni 到 IDEA、搭建 Resin 开发环境，或排查首次启动、WebRoot、WEB-INF、resin.xml 配置问题；需要访问 IT01 共享。
 ---
 
 # Yoooni 项目导入 IDEA（入职环境搭建）

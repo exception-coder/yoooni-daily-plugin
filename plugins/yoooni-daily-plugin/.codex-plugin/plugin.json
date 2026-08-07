@@ -1,6 +1,6 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "0.26.0",
+  "version": "0.26.1",
   "description": "Yoooni daily-work toolbox for Claude Code and Codex: 13 skills including the domain-knowledge bootstrap entry, onboarding pipeline, environment setup, team-tool lifecycle, production-log troubleshooting, task spaces, and hook reporting. Includes a SessionStart auto-update hook.",
   "author": {
     "name": "Zhang Kai",
@@ -33,7 +33,7 @@
   "interface": {
     "displayName": "Yoooni Daily Plugin",
     "shortDescription": "Yoooni 团队日常工具箱：入职、启动、安装/更新公司套件、生产排障、任务空间。",
-    "longDescription": "Yoooni 团队日常工作插件，9 个 Skill 覆盖：入职初始化（SVN 拉文档）、SMB 共享访问修复、IDEA/Resin 开发环境搭建、日常启动、一键安装与全自动更新公司插件+MCP、生产日志排障、跨目录任务空间、hook 命中周报；并内置 SessionStart 自动更新 hook（后台 git pull + claude plugin update + 同步命中日志）。Works across Claude Code and Codex.",
+    "longDescription": "Yoooni 团队日常工作插件，13 个 Skill 覆盖业务真理初始化、项目 onboarding、ERP 自动开发、开发工作台、入职与环境搭建、日常启动、团队工具安装更新、生产日志排障、任务空间和 hook 周报；并内置 SessionStart 自动更新 hook。Works across Claude Code and Codex.",
     "developerName": "Zhang Kai",
     "category": "Productivity",
     "capabilities": [
