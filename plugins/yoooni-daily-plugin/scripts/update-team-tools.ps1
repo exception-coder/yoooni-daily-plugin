@@ -2,7 +2,7 @@
 .SYNOPSIS
   全自动刷新公司团队套件，两部分都无需任何 slash / 手动操作：
     [MCP 仓] git pull project-domain-knowledge / cross-project-topology
-             若 project-domain-knowledge 有更新 -> npm install + npm run build
+             若 project-domain-knowledge 有更新 -> npm ci（有 lockfile）+ npm run build
              幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
     [插件]   claude plugin marketplace update 刷新源 ->
              claude plugin update <plugin>@<marketplace> 逐个更新
@@ -29,8 +29,12 @@ function Log($m){
   }
   Add-Content -Path $log -Value ("[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m)
 }
-$updateMutex = New-Object System.Threading.Mutex($false, 'Local\YoooniTeamToolsUpdate')
-if (-not $updateMutex.WaitOne(0)) { Log 'skip: another team-tools update is already running'; return }
+$lockHelper = Join-Path $PSScriptRoot 'update-lock.ps1'
+if (-not (Test-Path -LiteralPath $lockHelper)) { throw "update lock helper is missing: $lockHelper" }
+. $lockHelper
+$updateMutex = Enter-YoooniUpdateMutex
+if ($null -eq $updateMutex) { Log 'skip: another team-tools update is already running'; return }
+try {
 function Has($c){ [bool](Get-Command $c -ErrorAction SilentlyContinue) }
 function HasPdk($w){ return ($w -and (Test-Path (Join-Path $w 'project-domain-knowledge\.git'))) }
 function Escape-TomlString($s){ return (($s -replace '\\','/') -replace '"','\"') }
@@ -357,7 +361,14 @@ foreach ($pluginName in $pluginUrls.Keys) {
 
 if ($pdkChanged -and (Has npm)) {
   Push-Location $mcpDir
-  try { Log "  npm install/build (engine updated)"; npm install 2>&1 | ForEach-Object { Log ("  npm " + $_) }; npm run build 2>&1 | ForEach-Object { Log ("  build " + $_) } }
+  try {
+    $installArgs = if (Test-Path (Join-Path $mcpDir 'package-lock.json')) { @('ci', '--no-audit', '--no-fund') } else { @('install', '--no-audit', '--no-fund') }
+    Log ("  npm {0}/build (engine updated)" -f $installArgs[0])
+    & npm @installArgs 2>&1 | ForEach-Object { Log ("  npm " + $_) }
+    if ($LASTEXITCODE -ne 0) { throw "npm $($installArgs[0]) failed: exit $LASTEXITCODE" }
+    & npm run build 2>&1 | ForEach-Object { Log ("  build " + $_) }
+    if ($LASTEXITCODE -ne 0) { throw "npm run build failed: exit $LASTEXITCODE" }
+  }
   finally { Pop-Location }
 }
 
@@ -492,8 +503,9 @@ if (Test-Path $evLocal) {
 # 信号由 team-standards 的 prompt-signal-capture(UserPromptSubmit) hook 写到本地
 # ~/.kai-toolbox/prompt-signals-<用户>-<机器>.jsonl(本地文件名已含用户+机器，整文件覆盖即幂等)，
 # 这里把每份快照原名复制到 \\IT01\版本更新\vibecoding\，供聚合 skill 反推缺失的知识图谱/标准约束。
-# 上行默认开；YOOONI_PROMPT_SIGNAL_UPLOAD=off 时只留本地、不推共享。
-if (($env:YOOONI_PROMPT_SIGNAL_UPLOAD).ToLower() -ne 'off') {
+# prompt 原文比普通 hook 标签更敏感：上行默认关闭，只有显式设为 on 才推共享。
+$promptSignalUpload = [string]$env:YOOONI_PROMPT_SIGNAL_UPLOAD
+if ($promptSignalUpload.ToLowerInvariant() -eq 'on') {
   try {
     $psShareDir = '\\IT01\版本更新\vibecoding'
     $psLocal = @(Get-ChildItem -Path $state -Filter 'prompt-signals-*.jsonl' -File -ErrorAction SilentlyContinue)
@@ -509,7 +521,7 @@ if (($env:YOOONI_PROMPT_SIGNAL_UPLOAD).ToLower() -ne 'off') {
     }
   } catch { Log ("  promptsignal sync skipped: " + $_.Exception.Message) }
 } else {
-  Log "  promptsignal: YOOONI_PROMPT_SIGNAL_UPLOAD=off，仅留本地不上行"
+  Log "  promptsignal: 默认仅留本地；设 YOOONI_PROMPT_SIGNAL_UPLOAD=on 才上行"
 }
 
 # --- best-effort 同步「知识图谱 + 术语表」到公司共享(每人一文件夹)；只上行可复用知识资产 ---
@@ -555,5 +567,7 @@ if (Test-Path $reg) {
 }
 
 Log ("=== update done (pdkChanged={0}, pluginsUpdated={1}) ===" -f $pdkChanged, $pluginUpdated.Count)
-$updateMutex.ReleaseMutex()
-$updateMutex.Dispose()
+}
+finally {
+  Exit-YoooniUpdateMutex $updateMutex
+}

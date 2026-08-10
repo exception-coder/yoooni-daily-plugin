@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # update-team-tools.sh —— macOS / Linux 版「自动刷新公司团队套件」，对照 update-team-tools.ps1。
 #   [MCP 仓] git pull project-domain-knowledge / cross-project-topology
-#            project-domain-knowledge 有更新 -> npm install + npm run build
+#            project-domain-knowledge 有更新 -> npm ci（有 lockfile）+ npm run build
 #            内容有更新则幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
 #   [插件]   claude plugin marketplace update 刷源 -> claude plugin update <p>@<p> 逐个更新
 #            (team-standards / project-coding-profiles / yoooni-daily-plugin)，幂等
 # 被 SessionStart hook(session-autoupdate.js, darwin/linux 分支)、launchd 计划任务、更新 skill 共用。
 # 用法: bash update-team-tools.sh [-s user|local|project] [-w <workspaceDir>]
-set -u
+set -u -o pipefail
 
 MCP_SCOPE="user"
 WORKSPACE_DIR=""
@@ -19,15 +19,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/update-lock.sh"
 STATE_DIR="$HOME/.kai-toolbox"
-mkdir -p "$STATE_DIR"
-LOCK_DIR="$STATE_DIR/team-tools-update.lock"
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then exit 0; fi
-trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+acquire_yoooni_update_lock "$STATE_DIR" || exit 0
+trap 'release_yoooni_update_lock' EXIT INT TERM
 LOG="$STATE_DIR/team-tools-update.log"
 NOTICE="$STATE_DIR/team-tools-update.notice"
 CFG="$STATE_DIR/workspace.path"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 log() {
   if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 10485760 ]; then mv -f "$LOG" "$LOG.1"; fi
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG"
@@ -270,8 +269,13 @@ for repo_name in team-standards project-coding-profiles yoooni-daily-plugin; do
 done
 
 if [ "$PDK_CHANGED" = "1" ] && has npm; then
-  log "  npm install/build (engine updated)"
-  ( cd "$MCP_DIR" && npm install 2>&1 | while IFS= read -r l; do log "  npm $l"; done && npm run build 2>&1 | while IFS= read -r l; do log "  build $l"; done )
+  if [ -f "$MCP_DIR/package-lock.json" ]; then
+    log "  npm ci/build (engine updated)"
+    ( cd "$MCP_DIR" && npm ci --no-audit --no-fund 2>&1 | while IFS= read -r l; do log "  npm $l"; done && npm run build 2>&1 | while IFS= read -r l; do log "  build $l"; done )
+  else
+    log "  npm install/build (engine updated; no package-lock.json)"
+    ( cd "$MCP_DIR" && npm install --no-audit --no-fund 2>&1 | while IFS= read -r l; do log "  npm $l"; done && npm run build 2>&1 | while IFS= read -r l; do log "  build $l"; done )
+  fi
 fi
 
 ENTRY="$MCP_DIR/dist/server.js"

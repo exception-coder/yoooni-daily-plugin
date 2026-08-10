@@ -33,7 +33,6 @@ function run() {
     if (due) {
       const scripts = path.join(__dirname, '..', 'scripts');
       if (process.platform === 'win32') {
-        try { fs.writeFileSync(stamp, String(Date.now())); } catch (e) {}
         const ps1 = path.join(scripts, 'update-team-tools.ps1');
         const vbs = path.join(scripts, 'run-hidden.vbs');
         try {
@@ -41,16 +40,19 @@ function run() {
           // （-WindowStyle Hidden 是"先开窗再藏"，挡不住那一瞬，故弃用）。
           const child = spawn('wscript.exe', [vbs, ps1],
             { detached: true, stdio: 'ignore', windowsHide: true });
+          if (!child.pid) return finish(out);
+          try { fs.writeFileSync(stamp, String(Date.now())); } catch (e) {}
           child.unref();
           out += '公司团队套件正在后台刷新(每日一次：MCP 仓 git pull + 插件 update)。';
         } catch (e) {}
       } else if (process.platform === 'darwin' || process.platform === 'linux') {
         // macOS / Linux：后台 detached 跑 bash 版（无窗口概念，直接 detach + 丢弃输出）。
-        try { fs.writeFileSync(stamp, String(Date.now())); } catch (e) {}
         const sh = path.join(scripts, 'update-team-tools.sh');
         try {
           const child = spawn('bash', [sh],
             { detached: true, stdio: 'ignore' });
+          if (!child.pid) return finish(out);
+          try { fs.writeFileSync(stamp, String(Date.now())); } catch (e) {}
           child.unref();
           out += '公司团队套件正在后台刷新(每日一次：MCP 仓 git pull + 插件 update)。';
         } catch (e) {}

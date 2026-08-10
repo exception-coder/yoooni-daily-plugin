@@ -8,8 +8,9 @@ description: 查询 Yoooni 生产后台 apiRegistrylog。用户要求按接口�
 通过生产后台的**接口注册日志**页面（`apiRegistrylog_list.action`）排查线上接口调用情况。
 对应页面：`https://wyoooni.net/sys/apiRegistrylog_list.action`。
 
-认证方式：脚本用配置文件里的**账号密码**自动登录（Spring Security `/j_spring_security_check`）拿会话，
-**不再需要手工复制 cookie，也不会遇到 cookie 过期**。账号密码**仅存本机用户目录、不入仓库**。
+认证方式：脚本用配置文件里的账号和 **Windows DPAPI(CurrentUser) 加密密码**自动登录
+（Spring Security `/j_spring_security_check`）拿会话，**不再需要手工复制 cookie**。
+密文只能由录入凭据的同一 Windows 用户解密，配置仅存本机用户目录、不入仓库。
 
 ## 触发条件
 
@@ -39,23 +40,26 @@ description: 查询 Yoooni 生产后台 apiRegistrylog。用户要求按接口�
 
 ### Step 1：确认/初始化账号密码
 
-账号密码存在配置文件（用户主目录，插件升级不覆盖）：
+凭据配置存在用户主目录，插件升级不覆盖：
 - Windows：`%USERPROFILE%\.config\yoooni\prod-backend.json`
 
-首次运行脚本会自动创建模板并退出（exit 2），提示填账号密码。引导用户：
+首次运行脚本会自动创建不含明文密码的模板并退出（exit 2）。引导用户运行：
 
-1. 打开配置文件 `%USERPROFILE%\.config\yoooni\prod-backend.json`
-2. 把 `username` / `password` 填成生产后台 `https://wyoooni.net` 的**登录账号和密码**
-3. 告诉我「填好了」再继续
+```powershell
+powershell -ExecutionPolicy Bypass -File "<plugin>\skills\yoooni-prod-log-query\query-prod-log.ps1" -SetCredential
+```
 
-> 配置示例：
+脚本交互读取账号与密码（密码不回显），随后只保存 DPAPI 密文：
+
 > ```json
 > {
 >   "base_url": "https://wyoooni.net",
 >   "username": "你的登录账号",
->   "password": "你的登录密码"
+>   "password_protected": "AQAAANCM..."
 > }
 > ```
+
+旧版配置若仍含 `password` 明文，下一次查询会先成功加密、再原位移除明文字段；迁移失败则停止生产请求。
 
 ### Step 2：向用户确认查询条件
 
@@ -75,22 +79,23 @@ powershell -ExecutionPolicy Bypass -File ".\query-prod-log.ps1" `
 
 脚本退出码：
 - `0` 成功
-  - 不带 `-AllPages`：第 1 页原始 HTML 存 `%TEMP%\yoooni-prod-log\apilog_<时间>.html`，并打印总记录/总页数
-  - 带 `-AllPages`：翻页合并后的 HTML 存 `%TEMP%\yoooni-prod-log\apilog_all_<时间>.html`（仅含去重数据行，便于一次 Read 解析全部）
-- `2` 账号密码未配置/未填 → 引导用户填账号密码（Step 1）
+  - 不带 `-AllPages`：第 1 页脱敏 HTML 存 `%TEMP%\yoooni-prod-log\apilog_<时间>.html`
+  - 带 `-AllPages`：翻页合并后的脱敏 HTML 存 `%TEMP%\yoooni-prod-log\apilog_all_<时间>.html`
+  - 输出默认保留 3 天，可用 `-RetentionDays 1..30` 调整
+- `2` 凭据未配置、无法解密或迁移失败 → 用 `-SetCredential` 重新录入（Step 1）
 - `3` **登录失败**（账号密码错误/被锁，或会话被并发登录挤掉）→ 见下方
 - `1` 请求失败（网络不通等）
 
 ### Step 4：解析结果
 
-查询成功后，**直接 Read 脚本打印的 HTML 文件**解析日志表格（接口、url、内容、时间、状态等），按用户排查目的总结；或让用户在浏览器打开核对。
+查询成功后，**直接 Read 脚本打印的脱敏 HTML 文件**解析日志表格（接口、url、内容、时间、状态等），按用户排查目的总结；或让用户在浏览器打开核对。脚本会屏蔽常见令牌、密码、Cookie、邮箱和手机号，但仍应按生产数据处理，不要复制到外部服务。
 
 > 数据行里的业务字段在 **Body / Result** 列的 JSON 里（如 `makedate` 制单时间、`checkdate` 审核时间、`proid` 货品 id、`code` 单号）。时间是**毫秒时间戳**，换算用 UTC+8。
 
 ## 登录失败怎么办（exit 3）
 
 1. 用浏览器登录 `https://wyoooni.net` 验证账号密码能否正常进后台
-2. 若密码改了，更新配置文件 `%USERPROFILE%\.config\yoooni\prod-backend.json` 的 `password`
+2. 若密码改了，重新运行脚本并加 `-SetCredential`
 3. 重新执行 Step 3
 
 > 极少数情况下，账号在别处重新登录会把本会话挤掉——重跑一次脚本即可（每次跑都会重新登录拿新会话）。
@@ -114,4 +119,4 @@ Test-NetConnection -ComputerName wyoooni.net -Port 443
 确认接口方法名拼写与后台一致（`-Url`）；扩大日期范围。
 
 ### 安全提示
-配置文件含登录账号密码，**仅存本机用户目录、不要提交到任何仓库**（`.config/yoooni/` 不在插件仓库内）。
+配置文件只保存 DPAPI 密文并收紧为当前用户 ACL。不要提交配置或脱敏日志到任何仓库；脚本只接受无自定义端口、无路径的 `https://wyoooni.net`，避免凭据被错误发送到其它站点。维护者可用 `-SelfTest` 在不访问生产网络的情况下验证 DPAPI、明文迁移、脱敏、ACL、域名和保留期。

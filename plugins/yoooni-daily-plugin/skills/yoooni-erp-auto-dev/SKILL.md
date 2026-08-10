@@ -5,7 +5,7 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
 
 # ERP 小需求自动开发 Skill
 
-把「接一个 ERP 小需求」的全套动作编排成一条**门控流水线**：**定位页面代码 → 查业务知识图谱 → 查库 → 出方案 → 按规范改码 → 自检出 diff**。输入只要两样：**模块（中文名 或 粘一个页面 URL/\*.action）+ 需求描述**。
+把「接一个 ERP 小需求」的全套动作编排成一条**门控流水线**：**定位页面代码 → 查业务知识图谱与库 → 必要时挖掘对象规格 → 出方案 → 按规范改码 → 验证业务闭环 → 自检出 diff**。输入只要两样：**模块（中文名 或 粘一个页面 URL/\*.action）+ 需求描述**。
 
 **定位**：编排器，不是黑盒。机械步骤（定位、查图谱、查库、编译自检）自动跑；需判断的节点（命中的是不是目标页面、方案对不对、要不要动 DB）停下来让人拍板。复用公司已沉淀的能力，不重造。
 
@@ -19,6 +19,7 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
 
 - ❌ **不无人值守**：命中页面、实现方案、任何 DB/迁移/状态字典改动，都要过人工关卡，人点头才继续。
 - ❌ **不重写下层逻辑**：定位走 `url-locate`、业务口径走 `domain-knowledge` MCP、编码规范走 `project-coding-profiles`/`team-standards`，一律调用、不在本 skill 复刻。
+- ❌ **不让 LLM 猜状态机**：对象、状态、字段语义、不变量和闭环候选必须来自已有业务真理或 `domain-spec-mining-required` 的证据链；候选不得自动升为稳定业务真理。
 - ❌ **只改不提交**：改完留在工作区、出 diff 给人看，**不 git add/commit/push**（提交由人确认后自行进行）。
 - ✅ **业务真相以知识图谱/DB 为准**：口径先查 `domain-knowledge`；状态字典/表结构以 **DDL/SQL 脚本**与库为可信来源，优先于类名推断。
 - ✅ **编码安全**：ERP 老工程可能是 GBK，改文件前遵守 `encoding-guard`（探测编码→安全回环写入），防中文乱码。
@@ -28,7 +29,7 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
 - 在能访问 ERP 项目代码的机器上，且团队套件已装（`yoooni-install-team-tools`）：`domain-knowledge` / `cross-topology` MCP、`project-coding-profiles`、`team-standards` 均可用。
 - 已授权的库查询通道（查表结构/状态字典）。
 
-## 五步门控流程
+## 七步门控流程
 
 被触发时，先把「模块 + 需求」复述确认范围，再逐步推进。每步：做事 → 过关卡（让用户拍板）→ 下一步。
 
@@ -47,6 +48,22 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
   该工具若回「未配置」，提示用户到「ERP 需求开发」填测试库只读连接。
 - 汇总"这个需求涉及的业务真相与数据面"，供出方案用。
 
+### ②A 对象中心规格挖掘 [条件自动 · 关卡]
+
+当需求涉及订单、库存、标签、审核、取消、退货、调拨、占用等**业务对象状态或关联变化**，且现有知识点没有完整覆盖对象终态、关联解除、不变量或下一动作时，调用 team-standards 的 `domain-spec-mining-required`：
+
+1. 先用 `list_spec_candidates` / `get_spec_candidate` 查询已有候选、反例和评审状态。
+2. 候选缺失时，复用 Graphify `graph.json`、DDL/反向索引和已授权的日志、历史表或测试前后快照，运行 `project-domain-knowledge` 的 `spec-mining` CLI；不在本 Skill 内复制挖掘逻辑。
+3. 输出本次对象闭环合同：
+   - 操作前后对象状态；
+   - 必须建立和解除的关联；
+   - 数据库终态断言；
+   - 事务失败与重复操作行为；
+   - 至少一个下一业务动作。
+4. 未解决的字段语义冲突、状态多目标或反例属于**关卡**，先请用户/业务 owner 确认，不能带冲突进入编码。
+
+纯展示、文案、样式或不改变业务对象状态的极简修改跳过本步。已有 confirmed 规格完整覆盖且无新冲突时，只读取复用，不重复挖掘。
+
 ### ③ 出轻量方案 + 验收清单 [半自动 · 关卡]
 
 - 走 `team-standards` 的 `design-doc`（按改动体量选**极简/轻量**档，不写大文档）：改哪些文件、加/改哪些字段或接口、对既有逻辑与状态的影响、回归风险点。
@@ -56,6 +73,7 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
   - 调 `saveAllcost.action`（`amount=100,type=1`）→ 期望 HTTP 200 且响应 `success=true`；
   - 回读 `SELECT status,amount FROM t_allcost WHERE id=?` → 期望 `status=1, amount=100`；
   - 打开 `allcost_list.action` → 期望列表首行金额显示 `100.00`（人眼确认）。
+- 涉及对象状态时，验收清单必须覆盖**上游动作 → 当前动作 → 下游下一动作**，并直接断言关键数据库终态；只写“接口成功/审核成功/按钮成功”不算闭环。
 - **关卡②**：方案 + 验收清单念给用户确认。用户可让其调整方向或补验收项后再改。
 
 ### ④ 按规范改码 [半自动 · 关卡]
@@ -80,9 +98,10 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
   - 调接口：`mcp__erp_app__http_call`（登录态实发 `*.action`，**只打本地/测试实例**）拿请求→响应；
   - 回读数据：`mcp__erp_db__query`（**只读** SELECT）核对数据落库效果；
   - 页面项：把目标 URL 念给用户/让其打开**人眼确认**（本期不做机器截图）。
+  - 下一动作：对状态/关联变更实际执行至少一个后续动作，例如标签入仓后再次配货或调拨；不能只查当前接口响应。
 - **c. 判定 + 出「接口验证区块」**：每条验收项按 `期望 vs 实际` 判 **PASS / FAIL**，并贴一张**接口验证区块**（这是执行留痕，不是文档描述）：
 
-  ```
+  ```text
   接口验证 · saveAllcost.action                         [PASS]
   1) 接口     POST /erp/allcost/saveAllcost.action（本次改动：金额校验分支）
   2) 请求参数  { amount: 100, type: 1 }
@@ -101,7 +120,7 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
 
 ## 收尾
 
-- 汇总：本次改了哪个模块、依据了哪些知识图谱口径/库信息、动了哪些文件、有无 DB 改动（若有，单列）、**自闭环验证结果（各接口验证区块 PASS/FAIL）**、回归风险点。
+- 汇总：本次改了哪个模块、依据了哪些稳定知识点与规格候选、候选证据/反例是否已解决、动了哪些文件、有无 DB 改动（若有，单列）、**数据库终态与下一动作验证结果（各接口验证区块 PASS/FAIL）**、回归风险点。
 - 若过程中发现知识图谱缺口（业务口径没记/记错），提示用户走 `domain-knowledge` 补登，让下次更准。
 
 ## 与下层能力的关系（不重造）
@@ -110,6 +129,7 @@ description: 编排 Yoooni ERP 小需求开发。用户提供模块名或页面 
 |---|---|
 | ① 定位 | project-coding-profiles 的 `url-locate`（URL→代码）；`domain-knowledge` 模块映射（中文名→代码） |
 | ② 查真相 | `domain-knowledge` / `cross-topology` MCP + `mcp__erp_db__query`（只读查测试库） |
+| ②A 对象规格 | team-standards 的 `domain-spec-mining-required` + project-domain-knowledge 的 `spec-mining` CLI / 候选 MCP 工具 |
 | ③ 方案 + 验收清单 | team-standards 的 `design-doc-required` |
 | ④ 改码 | team-standards 的 `pre-implementation-code-orientation` + project-coding-profiles（encoding-guard / module-scaffold） |
 | ⑤ 静态自检 | 编译/构建 |

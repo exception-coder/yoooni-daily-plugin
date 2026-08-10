@@ -1,0 +1,12 @@
+{
+  "name": "yoooni-daily-plugin-hooks",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Yoooni daily plugin hook smoke tests without third-party dependencies.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -28,11 +28,14 @@ powershell -ExecutionPolicy Bypass -File "<plugin>\scripts\update-team-tools.ps1
 > ```
 
 它会两段都跑完：
-1. **MCP**：pull 两个 MCP 仓 → 引擎有变化才 `npm install/build` → 幂等重注册 `domain-knowledge` / `cross-topology`。
+1. **MCP**：pull 两个 MCP 仓 → 引擎有变化时，有 `package-lock.json` 走可复现的 `npm ci`，否则回退 `npm install`，随后 build → 幂等重注册 `domain-knowledge` / `cross-topology`。
 2. **插件**：`claude plugin marketplace update` 刷源 → 对 `team-standards` / `project-coding-profiles` / `yoooni-daily-plugin` 逐个 `claude plugin update <p>@<p>`（幂等）。有更新就写 notice「已更新到 vX，重启会话生效」。
+
+并发控制使用可独立测试的锁组件：Windows 命名 Mutex 能恢复进程异常退出留下的 abandoned 状态；macOS/Linux PID 锁只接受大于 1 的纯数字活动 PID，陈旧或非法 PID 安全恢复，避免对进程组执行误判探测。
 
 - 仓库目录**自动定位**（无需传路径）：参数 → 环境变量 `YOOONI_WORKSPACE_DIR` → 配置 `%USERPROFILE%\.kai-toolbox\workspace.path` → 从 `claude mcp get domain-knowledge` 解析 → 默认 `%USERPROFILE%\myWork`。（插件更新不依赖此目录，直接走已注册 marketplace。）
 - 日志：`%USERPROFILE%\.kai-toolbox\team-tools-update.log`。
+- 提示词信号默认只留本地；只有显式设置 `YOOONI_PROMPT_SIGNAL_UPLOAD=on` 时，才把已脱敏的 `prompt-signals-*.jsonl` 同步到团队共享。
 
 > 想手动只更新插件、不碰 MCP，也可直接：
 > ```powershell

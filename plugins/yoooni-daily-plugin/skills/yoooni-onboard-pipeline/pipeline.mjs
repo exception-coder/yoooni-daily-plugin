@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // =============================================================
 // project-onboard-pipeline 编排脚本（机械胶水层）
-//   把「拉项目 → 画像/CLAUDE.md → 知识图谱 → 编码profile → 聚合 → 跨项目拓扑」
+//   把项目接入、画像、编码约束、实现图谱、领域知识、Core Spec、运行证据与拓扑
 //   这条初始化流水线的【确定性步骤】串起来；【需判断的步骤】留给 skill 里的 AI + 人。
 //
 //   设计红线（与 domain-knowledge-bootstrap 同源）：
@@ -16,7 +16,7 @@
 //   aggregate --name <系统名> --members <路径>...   调 taskspace 建聚合工作区(复用现有 skill 脚本)
 //   status   --state <状态文件>                     看某次 onboard 的阶段进度
 //
-// 状态文件：默认 ~/.kai-toolbox/onboard-<系统名>.json，记录各阶段 done/pending + 关卡待确认项。
+// 状态文件：默认 ~/.kai-toolbox/onboard-<系统名>.json，记录阶段生命周期与关卡待确认项。
 // =============================================================
 
 import fs from 'node:fs';
@@ -28,15 +28,24 @@ const STATE_DIR = path.join(os.homedir(), '.kai-toolbox');
 const TASKSPACE = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')),
   '..', 'yoooni-taskspace', 'taskspace.mjs');
 
-// 流水线六阶段（与 SKILL.md 对齐）
+const STATE_SCHEMA_VERSION = 2;
+const STAGE_STATUSES = new Set(['pending', 'needs-review', 'waiting-evidence', 'done', 'skipped']);
+const SKIPPABLE_STAGE_IDS = new Set(['aggregate', 'topology']);
+
+// 流水线十阶段（与 SKILL.md 对齐）。保留原六个阶段 ID，兼容已有状态文件。
 const STAGES = [
-  { id: 'fetch',     name: '① 拉取/定位项目',        auto: 'full',  gate: '确认仓库地址与前后端角色' },
-  { id: 'profile',   name: '② 项目画像 + CLAUDE.md',  auto: 'semi',  gate: '确认技术栈识别、编码(GBK/UTF-8)' },
-  { id: 'knowledge', name: '③ 业务知识图谱',          auto: 'human', gate: '模块切分、边界判定、stable 与否' },
-  { id: 'coding',    name: '④ 编码 profile',          auto: 'semi',  gate: '编码守护 vs 框架规范定性' },
-  { id: 'aggregate', name: '⑤ 前后端聚合工作区',      auto: 'full',  gate: '确认哪些仓属同一系统' },
-  { id: 'topology',  name: '⑥ 跨项目拓扑登记',        auto: 'human', gate: '确认集成关系是否登记' },
+  { id: 'fetch',     name: '① 拉取/定位项目',          auto: 'full',  gate: '确认仓库地址、角色与系统边界' },
+  { id: 'profile',   name: '② 项目画像 + Agent 入口',  auto: 'semi',  gate: '确认技术栈、分层、启动方式与编码' },
+  { id: 'coding',    name: '③ 编码 profile',           auto: 'semi',  gate: '确认 rootMarkers 与编码/框架定性' },
+  { id: 'aggregate', name: '④ 多仓聚合工作区',         auto: 'full',  gate: '确认成员完整；单仓项目可跳过' },
+  { id: 'graphify',  name: '⑤ Graphify 实现事实图谱',  auto: 'semi',  gate: 'graph.json 存在且健康检查已记录' },
+  { id: 'knowledge', name: '⑥ 领域知识与 DDL 基线',    auto: 'human', gate: '模块边界、路径与业务真理候选已确认' },
+  { id: 'core-spec', name: '⑦ Core Spec 静态候选',     auto: 'semi',  gate: '全模块候选已生成，未经评审不升 stable' },
+  { id: 'evidence',  name: '⑧ 运行证据与规格挖掘',     auto: 'semi',  gate: '证据可追溯；无数据时标记 waiting-evidence' },
+  { id: 'topology',  name: '⑨ 跨项目拓扑登记',         auto: 'human', gate: '集成关系已登记；无跨项目调用可跳过' },
+  { id: 'verify',    name: '⑩ 验证、评审与发布',       auto: 'human', gate: '必选阶段闭环，索引/MCP/交付报告已完成' },
 ];
+const STAGE_IDS = new Set(STAGES.map((stage) => stage.id));
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -55,6 +64,40 @@ function ensureStateDir() { try { fs.mkdirSync(STATE_DIR, { recursive: true }); 
 function statePath(name) { return path.join(STATE_DIR, `onboard-${name}.json`); }
 function loadState(name) { try { return JSON.parse(fs.readFileSync(statePath(name), 'utf8')); } catch { return null; } }
 function saveState(name, s) { ensureStateDir(); fs.writeFileSync(statePath(name), JSON.stringify(s, null, 2), 'utf8'); }
+
+function syncStateStages(state) {
+  state.schemaVersion = STATE_SCHEMA_VERSION;
+  state.stages = state.stages || {};
+  for (const stage of STAGES) {
+    const current = state.stages[stage.id] || {};
+    state.stages[stage.id] = {
+      ...current,
+      name: stage.name,
+      auto: stage.auto,
+      gate: stage.gate,
+      status: current.status || 'pending',
+    };
+  }
+  return state;
+}
+
+function validateStageStatus(status) {
+  if (!STAGE_STATUSES.has(status)) {
+    die(`未知状态 ${status}；允许值：${[...STAGE_STATUSES].join(', ')}`);
+  }
+}
+
+function validateStageTransition(state, stage, status) {
+  if (status === 'skipped' && !SKIPPABLE_STAGE_IDS.has(stage)) {
+    die(`阶段 ${stage} 不允许 skipped；只有 aggregate 和 topology 可跳过`);
+  }
+  if (stage !== 'verify' || status !== 'done') return;
+  const blockers = STAGES
+    .filter((candidate) => candidate.id !== 'verify')
+    .filter((candidate) => !['done', 'skipped'].includes(state.stages[candidate.id].status))
+    .map((candidate) => `${candidate.id}:${state.stages[candidate.id].status}`);
+  if (blockers.length) die(`verify 不能完成；仍有未闭环阶段：${blockers.join(', ')}`);
+}
 
 // PLACEHOLDER_CMDS
 
@@ -122,10 +165,15 @@ function cmdPlan(a) {
     return probeRepo(path.resolve(rp));
   });
   const separated = probes.filter((x) => x.role === 'frontend').length && probes.filter((x) => x.role === 'backend').length;
-  const state = loadState(name) || { system: name, createdAt: new Date().toISOString(), repos: [], stages: {} };
+  const state = syncStateStages(loadState(name) || {
+    system: name,
+    createdAt: new Date().toISOString(),
+    repos: [],
+    stages: {},
+  });
   state.repos = probes;
   state.separated = !!separated;
-  for (const s of STAGES) state.stages[s.id] = state.stages[s.id] || { name: s.name, auto: s.auto, gate: s.gate, status: 'pending' };
+  state.updatedAt = new Date().toISOString();
   saveState(name, state);
 
   console.log(`# Onboard 计划：${name}`);
@@ -143,11 +191,17 @@ function cmdPlan(a) {
 
 function cmdMark(a) {
   const name = a['name$']; const stage = a['stage$']; const status = a['status$'] || 'done';
-  if (!name || !stage) die('mark 需要 --name <系统> --stage <阶段id> [--status done|pending|skipped]');
-  const state = loadState(name) || die('找不到状态文件,先跑 plan');
-  if (!state.stages[stage]) die('未知阶段 ' + stage);
+  if (!name || !stage) {
+    die('mark 需要 --name <系统> --stage <阶段id> [--status pending|needs-review|waiting-evidence|done|skipped]');
+  }
+  if (!STAGE_IDS.has(stage)) die('未知阶段 ' + stage);
+  validateStageStatus(status);
+  const loaded = loadState(name) || die('找不到状态文件,先跑 plan');
+  const state = syncStateStages(loaded);
+  validateStageTransition(state, stage, status);
   state.stages[stage].status = status;
   state.stages[stage].at = new Date().toISOString();
+  state.updatedAt = new Date().toISOString();
   saveState(name, state);
   console.log(`✓ ${name} / ${stage} → ${status}`);
 }
@@ -166,13 +220,20 @@ function cmdAggregate(a) {
 function cmdStatus(a) {
   const name = a['name$'] || a._[0];
   if (!name) die('status 需要 --name <系统>');
-  const state = loadState(name) || die('找不到状态文件');
+  const loaded = loadState(name) || die('找不到状态文件');
+  const state = syncStateStages(loaded);
   console.log(`# Onboard 状态：${state.system}（前后端分离:${state.separated}）`);
   for (const s of STAGES) {
     const st = state.stages[s.id] || {};
-    const mark = st.status === 'done' ? '✓' : st.status === 'skipped' ? '—' : '·';
+    const mark = st.status === 'done' ? '✓'
+      : st.status === 'skipped' ? '—'
+        : st.status === 'needs-review' ? '?'
+          : st.status === 'waiting-evidence' ? '~'
+            : '·';
     console.log(`${mark} ${s.name}  [${st.status || 'pending'}]`);
   }
+  const next = STAGES.find((stage) => !['done', 'skipped'].includes(state.stages[stage.id].status));
+  console.log(next ? `下一待办：${next.id} — ${next.gate}` : '全部阶段已闭环。');
 }
 
 const a = parseArgs(process.argv.slice(2));
@@ -186,7 +247,8 @@ switch (a._[0]) {
 
 用法:
   node pipeline.mjs plan --repos <路径或url>... [--name <系统名>] [--ws <工作区父目录>]
-  node pipeline.mjs mark --name <系统> --stage <fetch|profile|knowledge|coding|aggregate|topology> [--status done|skipped]
+  node pipeline.mjs mark --name <系统> --stage <fetch|profile|coding|aggregate|graphify|knowledge|core-spec|evidence|topology|verify>
+    [--status pending|needs-review|waiting-evidence|done|skipped]
   node pipeline.mjs aggregate --name <系统> --members <路径>...
   node pipeline.mjs status --name <系统>`);
 }
