@@ -70,6 +70,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Compare Claude, Codex, and marketplace versions
         shell: pwsh
         run: |
@@ -81,3 +83,5 @@ jobs:
           if (($versions | Select-Object -Unique).Count -ne 1) {
             throw "version mismatch: $($versions -join ', ')"
           }
+      - name: Require a version bump for runtime payload changes
+        run: node scripts/check-runtime-version-bump.js --base "${{ github.event.pull_request.base.sha || 'HEAD^' }}" --target HEAD

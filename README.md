@@ -231,3 +231,5 @@ node --test plugins/yoooni-daily-plugin/hooks/tests/install-smoke.test.js
 ```
 
 修改插件代码后需要重新加载或安装对应版本；仅修改仓库 README 不需要重装插件。
+
+CI 不只检查三处 manifest 相等，还会与 Git 基线比较：Skill、运行时 Hook、命令、脚本或 MCP 载荷变化而版本未递增时直接阻断；测试、README、docs 和纯仓库级发布脚本不触发插件发版。

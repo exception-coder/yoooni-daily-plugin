@@ -50,6 +50,12 @@ UserPromptSubmit hook，每条 prompt 提交时比对：
 已知局限（鸡生蛋）：本 hook 自身也要会话重启后才生效，故只对「装上本 hook 之后的
 版本更新」起作用——越早铺开越省心。
 
+## 运行载荷版本门禁
+
+- 更新流程以 Plugin manifest 版本决定是否重装插件，以 MCP 引擎版本决定是否重新安装依赖和构建。
+- 三处 manifest 相等只是格式正确；CI 还需比较 Git 基线，运行载荷变化而版本未递增时阻断。
+- 知识仓内容不触发 MCP 引擎重建，刷新 catalog 并调用 `reload_knowledge` 即可。
+
 ## 边界
 
 - team-standards：只产生本地信号，不感知 \\IT01。
