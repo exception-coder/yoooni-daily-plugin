@@ -1,6 +1,6 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "0.27.1",
+  "version": "0.27.2",
   "description": "Yoooni daily-work toolbox for Claude Code and Codex: 13 skills including the domain-knowledge bootstrap entry, onboarding pipeline, environment setup, team-tool lifecycle, production-log troubleshooting, task spaces, and hook reporting. Includes a SessionStart auto-update hook.",
   "author": {
     "name": "Zhang Kai",

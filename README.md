@@ -163,7 +163,7 @@ flowchart LR
 | 团队反馈 | [`yoooni-hook-report`](plugins/yoooni-daily-plugin/skills/yoooni-hook-report/SKILL.md) | 汇总规则命中和疑问纠正信号 |
 | 新项目接入 | [`yoooni-onboard-pipeline`](plugins/yoooni-daily-plugin/skills/yoooni-onboard-pipeline/SKILL.md) | 编排十阶段项目初始化流水线 |
 | 业务知识冷启动 | [`domain-knowledge-bootstrap`](plugins/yoooni-daily-plugin/skills/domain-knowledge-bootstrap/SKILL.md) | 转交权威流程，按模块起草业务真理 |
-| ERP 需求开发 | [`yoooni-erp-auto-dev`](plugins/yoooni-daily-plugin/skills/yoooni-erp-auto-dev/SKILL.md) | 定位、查真相、规格挖掘、改码和闭环验证 |
+| ERP 需求开发 | [`yoooni-erp-auto-dev`](plugins/yoooni-daily-plugin/skills/yoooni-erp-auto-dev/SKILL.md) | 定位、查真相、规格挖掘、改码和风险分级的最小充分验证 |
 | 工作台脚手架 | [`yoooni-devmodule-scaffold`](plugins/yoooni-daily-plugin/skills/yoooni-devmodule-scaffold/SKILL.md) | 按 ERP 范式生成需求开发工作台模块 |
 
 新人环境链路是：
