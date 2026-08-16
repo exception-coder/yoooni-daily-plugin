@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -64,6 +64,8 @@ jobs:
       - name: Run hook tests
         working-directory: plugins/yoooni-daily-plugin/hooks
         run: npm test
+      - name: Run onboarding pipeline tests
+        run: node --test plugins/yoooni-daily-plugin/scripts/tests/onboard-pipeline.test.mjs
 
   version-sync:
     name: plugin manifest versions in sync

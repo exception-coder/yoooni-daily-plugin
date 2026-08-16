@@ -71,5 +71,5 @@ if (($v1 -ne $v2) -or ($v1 -ne $v3)) { Write-Error "version mismatch: claude plu
 ## Style notes
 
 - Comments and skill docs are **Chinese-first**.
-- Main branch: commit directly to `main` and push (individual-maintained release branch, no PR needed).
+- Main branch: commit directly to `master` and push (individual-maintained release branch, no PR needed).
 - Commit style: `feat/fix/refactor/docs(scope): 标题`，body 中文说明。
