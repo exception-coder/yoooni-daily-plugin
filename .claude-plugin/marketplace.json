@@ -9,7 +9,7 @@
     {
       "name": "yoooni-daily-plugin",
       "description": "Yoooni 日常工作 Claude Code / Codex 插件：14 个 Skill（含业务真理初始化、新项目初始化流水线、Oracle DDL 快照同步、ERP 小需求自动开发、开发模块脚手架、入职与日常工具、团队套件安装更新、生产日志查询、跨目录任务空间和 hook 命中周报）+ SessionStart 自动更新 hook。",
-      "version": "0.28.0",
+      "version": "0.28.1",
       "source": "./plugins/yoooni-daily-plugin",
       "author": {
         "name": "张凯",

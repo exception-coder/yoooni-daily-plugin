@@ -529,7 +529,8 @@ if ($promptSignalUpload.ToLowerInvariant() -eq 'on') {
 #  → \\IT01\版本更新\vibecoding\<用户>-<机器>\ai-docs\<project>\...（robocopy /MIR 镜像，含删除）
 # 本地永远是源(只 local→共享)；连不上/无源就跳过。off 热路径(随更新周期跑)。
 # YOOONI_KG_UPLOAD=off 关闭上行(仅本地沉淀)。work-log / bug 等个人内容不上行。
-if (($env:YOOONI_KG_UPLOAD).ToLower() -ne 'off') {
+$knowledgeUpload = [string]$env:YOOONI_KG_UPLOAD
+if ($knowledgeUpload.ToLowerInvariant() -ne 'off') {
   try {
     $aiDocsRoot = Join-Path $env:USERPROFILE 'Documents\ai-docs'
     $kgShareRoot = '\\IT01\版本更新\vibecoding\{0}-{1}\ai-docs' -f $env:USERNAME, $env:COMPUTERNAME

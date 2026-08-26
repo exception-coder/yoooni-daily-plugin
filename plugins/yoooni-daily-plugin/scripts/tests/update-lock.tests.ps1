@@ -1,5 +1,9 @@
 ﻿$ErrorActionPreference = 'Stop'
 $helper = (Resolve-Path (Join-Path $PSScriptRoot '..\update-lock.ps1')).Path
+$updateScript = Get-Content -Raw (Join-Path $PSScriptRoot '..\update-team-tools.ps1')
+if ($updateScript -notmatch '\[string\]\$env:YOOONI_KG_UPLOAD') {
+  throw 'YOOONI_KG_UPLOAD must be normalized before string operations'
+}
 . $helper
 
 $name = 'Local\YoooniTeamToolsUpdateTest-' + [guid]::NewGuid().ToString('N')
