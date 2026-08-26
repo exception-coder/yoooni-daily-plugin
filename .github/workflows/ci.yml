@@ -38,6 +38,11 @@ jobs:
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass -File
           plugins/yoooni-daily-plugin/scripts/tests/update-lock.tests.ps1
+      - name: Run DDL sync tests
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -File
+          plugins/yoooni-daily-plugin/scripts/tests/ddl-sync.tests.ps1
 
   shell:
     name: Shell syntax

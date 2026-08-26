@@ -1,7 +1,7 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "0.27.2",
-  "description": "Yoooni daily-work toolbox for Claude Code and Codex: 13 skills including the domain-knowledge bootstrap entry, onboarding pipeline, environment setup, team-tool lifecycle, production-log troubleshooting, task spaces, and hook reporting. Includes a SessionStart auto-update hook.",
+  "version": "0.28.0",
+  "description": "Yoooni daily-work toolbox for Claude Code and Codex: 14 skills including domain-knowledge bootstrap, project onboarding, safe Oracle DDL snapshot synchronization, environment setup, team-tool lifecycle, production-log troubleshooting, task spaces, and hook reporting. Includes a SessionStart auto-update hook.",
   "author": {
     "name": "Zhang Kai",
     "email": "ping.yang@kpay-group.com"
@@ -26,13 +26,15 @@
     "troubleshoot",
     "taskspace",
     "junction",
-    "symlink"
+    "symlink",
+    "ddl",
+    "oracle-schema"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Yoooni Daily Plugin",
     "shortDescription": "Yoooni \u56e2\u961f\u65e5\u5e38\u5de5\u5177\u7bb1\uff1a\u5165\u804c\u3001\u542f\u52a8\u3001\u5b89\u88c5/\u66f4\u65b0\u516c\u53f8\u5957\u4ef6\u3001\u751f\u4ea7\u6392\u969c\u3001\u4efb\u52a1\u7a7a\u95f4\u3002",
-    "longDescription": "Yoooni \u56e2\u961f\u65e5\u5e38\u5de5\u4f5c\u63d2\u4ef6\uff0c13 \u4e2a Skill \u8986\u76d6\u4e1a\u52a1\u771f\u7406\u521d\u59cb\u5316\u3001\u9879\u76ee onboarding\u3001ERP \u81ea\u52a8\u5f00\u53d1\u3001\u5f00\u53d1\u5de5\u4f5c\u53f0\u3001\u5165\u804c\u4e0e\u73af\u5883\u642d\u5efa\u3001\u65e5\u5e38\u542f\u52a8\u3001\u56e2\u961f\u5de5\u5177\u5b89\u88c5\u66f4\u65b0\u3001\u751f\u4ea7\u65e5\u5fd7\u6392\u969c\u3001\u4efb\u52a1\u7a7a\u95f4\u548c hook \u5468\u62a5\uff1b\u5e76\u5185\u7f6e SessionStart \u81ea\u52a8\u66f4\u65b0 hook\u3002Works across Claude Code and Codex.",
+    "longDescription": "Yoooni \u56e2\u961f\u65e5\u5e38\u5de5\u4f5c\u63d2\u4ef6\uff0c14 \u4e2a Skill \u8986\u76d6\u4e1a\u52a1\u771f\u7406\u521d\u59cb\u5316\u3001\u9879\u76ee onboarding\u3001Oracle DDL \u5feb\u7167\u540c\u6b65\u3001ERP \u81ea\u52a8\u5f00\u53d1\u3001\u5f00\u53d1\u5de5\u4f5c\u53f0\u3001\u5165\u804c\u4e0e\u73af\u5883\u642d\u5efa\u3001\u65e5\u5e38\u542f\u52a8\u3001\u56e2\u961f\u5de5\u5177\u5b89\u88c5\u66f4\u65b0\u3001\u751f\u4ea7\u65e5\u5fd7\u6392\u969c\u3001\u4efb\u52a1\u7a7a\u95f4\u548c hook \u5468\u62a5\uff1b\u5e76\u5185\u7f6e SessionStart \u81ea\u52a8\u66f4\u65b0 hook\u3002Works across Claude Code and Codex.",
     "developerName": "Zhang Kai",
     "category": "Productivity",
     "capabilities": [
@@ -42,7 +44,8 @@
     "defaultPrompt": [
       "\u6211\u662f\u65b0\u540c\u4e8b\uff0c\u600e\u4e48\u5f00\u59cb\uff1f",
       "\u5b89\u88c5\u516c\u53f8\u56e2\u961f\u5de5\u5177\u3002",
-      "\u542f\u52a8 Yoooni \u9879\u76ee\u3002"
+      "\u542f\u52a8 Yoooni \u9879\u76ee\u3002",
+      "\u68c0\u67e5 Yoooni DDL \u662f\u5426\u6f02\u79fb\u3002"
     ],
     "brandColor": "#0EA5E9"
   }

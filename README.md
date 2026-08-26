@@ -10,7 +10,7 @@ Yoooni 团队工具链的统一入口。它把新同事入职、项目初始化�
 - [核心能力](#核心能力)：这套入口能完成什么
 - [快速安装](#快速安装)：单独安装或全新机器一键装齐
 - [新项目初始化](#新项目初始化)：从源码到可验证规格的十阶段流程
-- [Skills](#skills)：13 个可直接触发的工作流
+- [Skills](#skills)：14 个可直接触发的工作流
 - [自动更新与安全](#自动更新与安全)：版本同步、锁、日志和凭据策略
 - [维护与验证](#维护与验证)：仓库结构和自检入口
 
@@ -71,6 +71,7 @@ flowchart LR
 - 调用 Graphify 建立静态代码事实层。
 - 按模块起草业务真理、DDL 基线和对象中心 Core Spec 候选。
 - 将跨项目调用关系登记到独立拓扑库，并做最终健康检查。
+- 从真实 Oracle Schema 安全检查或刷新 DDL 基线，以表数、哈希和原子替换门禁防止坏快照污染知识库。
 
 ### ERP 受控开发
 
@@ -148,7 +149,7 @@ flowchart LR
 
 ## Skills
 
-当前插件提供 13 个 Skill。详细规则以各自 `SKILL.md` 为准，README 只保留发现入口。
+当前插件提供 14 个 Skill。详细规则以各自 `SKILL.md` 为准，README 只保留发现入口。
 
 | 场景 | Skill | 作用 |
 |---|---|---|
@@ -162,9 +163,14 @@ flowchart LR
 | 多仓工作区 | [`yoooni-taskspace`](plugins/yoooni-daily-plugin/skills/yoooni-taskspace/SKILL.md) | 用 junction/symlink 聚合独立仓库 |
 | 团队反馈 | [`yoooni-hook-report`](plugins/yoooni-daily-plugin/skills/yoooni-hook-report/SKILL.md) | 汇总规则命中和疑问纠正信号 |
 | 新项目接入 | [`yoooni-onboard-pipeline`](plugins/yoooni-daily-plugin/skills/yoooni-onboard-pipeline/SKILL.md) | 编排十阶段项目初始化流水线 |
+| DDL 快照 | [`yoooni-ddl-sync`](plugins/yoooni-daily-plugin/skills/yoooni-ddl-sync/SKILL.md) | 安全检查或同步 Oracle DDL，并按需管理用户级计划任务 |
 | 业务知识冷启动 | [`domain-knowledge-bootstrap`](plugins/yoooni-daily-plugin/skills/domain-knowledge-bootstrap/SKILL.md) | 转交权威流程，按模块起草业务真理 |
 | ERP 需求开发 | [`yoooni-erp-auto-dev`](plugins/yoooni-daily-plugin/skills/yoooni-erp-auto-dev/SKILL.md) | 定位、查真相、规格挖掘、改码和风险分级的最小充分验证 |
 | 工作台脚手架 | [`yoooni-devmodule-scaffold`](plugins/yoooni-daily-plugin/skills/yoooni-devmodule-scaffold/SKILL.md) | 按 ERP 范式生成需求开发工作台模块 |
+
+### Yoooni DDL 快照同步
+
+`yoooni-ddl-sync` 将 DDL 维护拆成安全录入、只读导出、完整性校验、漂移检查、原子发布和可选调度。首次使用先录入 DPAPI 凭据并人工执行一次同步；之后可以只检查变化，或在用户明确指定时间后注册周任务。同步器只更新本地知识仓工作树，不自动提交或推送。
 
 新人环境链路是：
 
@@ -196,6 +202,8 @@ yoooni-onboard-init
 - Prompt 信号先脱敏和截断，默认只保存在本机；只有设置 `YOOONI_PROMPT_SIGNAL_UPLOAD=on` 才会上报。
 - 知识资产同步只覆盖知识图谱和术语，不上传工作日志、Bug 文档等个人内容；`YOOONI_KG_UPLOAD=off` 可关闭。
 - SMB Guest 配置只适用于可信公司内网，启用前应理解其安全影响。
+- DDL 同步凭据使用 Windows DPAPI CurrentUser 加密；任务以同一用户运行，禁止改成 SYSTEM，也不会自动 commit 或 push 快照。
+- DDL 同步默认不创建计划任务；只有用户明确指定周期和时间后才注册，推荐每周低峰或在 Schema 迁移发布后触发。
 
 ---
 
@@ -210,7 +218,7 @@ yoooni-daily-plugin/
 ├── plugins/yoooni-daily-plugin/
 │   ├── .claude-plugin/              # Claude 插件 manifest
 │   ├── .codex-plugin/               # Codex 插件 manifest
-│   ├── skills/                      # 13 个工作流
+│   ├── skills/                      # 14 个工作流，含 yoooni-ddl-sync
 │   ├── hooks/                       # 自动更新与版本提醒
 │   └── scripts/                     # 安装、更新、卸载、健康检查
 ├── docs/                            # 维护文档
