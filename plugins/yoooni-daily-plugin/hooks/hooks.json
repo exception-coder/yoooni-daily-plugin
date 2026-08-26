@@ -1,13 +1,6 @@
 {
-  "description": "Codex and Claude Code hooks for daily team-tool updates and plugin-version checks.",
+  "description": "Codex and Claude Code hooks for plugin-version checks.",
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-autoupdate.js\"", "async": false }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [

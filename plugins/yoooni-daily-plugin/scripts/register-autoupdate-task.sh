@@ -2,7 +2,7 @@
 # register-autoupdate-task.sh —— macOS launchd 计划任务：每 N 小时自动刷新公司套件（会话外也刷新）。
 # 对照 register-autoupdate-task.ps1（Windows schtasks）。用户级 LaunchAgent，无需管理员。
 # 关键：任务指向【稳定启动器】~/.kai-toolbox/run-update.sh（非版本化的 update-team-tools.sh），
-# 启动器运行时再定位最新版脚本。"开 Claude Code 即刷新" 由 SessionStart hook 负责，二者互补。
+# 启动器运行时再定位最新版脚本。本脚本只在用户明确运行时注册任务；插件默认采用手动更新。
 # --only-if-exists：自愈模式，仅当 plist 已存在才校准；从未注册过则什么都不做。
 # 用法: bash register-autoupdate-task.sh [--every-hours 4] [--only-if-exists]
 set -u

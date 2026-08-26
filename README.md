@@ -55,8 +55,8 @@ flowchart LR
 ### 团队工具生命周期
 
 - 一键安装三个 Plugin、两个 MCP 实例及其源码仓库。
-- SessionStart 后台刷新与会话外定时更新互补。
-- 幂等安装、按需构建、MCP 重注册和版本过期提醒。
+- 默认仅手动更新；不会在会话启动或安装后自动刷新插件与 MCP。
+- 幂等安装、按需构建、MCP 重注册和只读版本过期提醒。
 - Windows Mutex、macOS/Linux PID 锁避免并发更新互相破坏。
 
 ### 新人和本地环境
@@ -189,9 +189,10 @@ yoooni-onboard-init
 
 ### 更新机制
 
-- `SessionStart` 每天最多触发一次后台刷新，不阻塞当前会话。
-- Windows 一键引导安装当前默认每 1 小时注册一次计划任务；直接运行 `register-autoupdate-task.ps1` 的默认值是 4 小时。
-- macOS 安装脚本默认每 4 小时注册 launchd；Linux 使用 cron 调用稳定启动器。
+- 插件不注册 `SessionStart` 自动更新 Hook；版本提醒 Hook 只提示，不修改插件、MCP 或配置。
+- Windows 与 macOS/Linux 一键引导安装默认不注册计划任务。
+- 日常更新由用户显式运行 `yoooni-update-team-tools` 或 `scripts/update-team-tools.*`。
+- 确需后台更新时，可显式运行 `register-autoupdate-task.*`；该能力不再默认开启。
 - 更新时只在 MCP 引擎变化后重新安装依赖并构建；知识内容变化不需要重复构建。
 - 稳定启动器放在 `~/.kai-toolbox/`，避免插件版本化缓存路径变化导致计划任务失效。
 
@@ -219,7 +220,7 @@ yoooni-daily-plugin/
 │   ├── .claude-plugin/              # Claude 插件 manifest
 │   ├── .codex-plugin/               # Codex 插件 manifest
 │   ├── skills/                      # 14 个工作流，含 yoooni-ddl-sync
-│   ├── hooks/                       # 自动更新与版本提醒
+│   ├── hooks/                       # 版本提醒
 │   └── scripts/                     # 安装、更新、卸载、健康检查
 ├── docs/                            # 维护文档
 └── README.md

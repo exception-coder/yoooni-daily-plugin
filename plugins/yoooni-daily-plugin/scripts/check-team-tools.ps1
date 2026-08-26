@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   This script is read-only. It checks local dependencies, Claude Code plugins,
-  MCP server connectivity, plugin cache manifests, and the auto-update task.
+  MCP server connectivity, plugin cache manifests, and optional auto-update task state.
 #>
 param(
     [string]$WorkspaceDir
@@ -202,7 +202,7 @@ function Test-AutoUpdateTask {
         Write-Check 'OK' 'Auto-update task exists' $statusLine
     }
     else {
-        Write-Check 'WARN' 'Auto-update task not found' 'Run team-tools-install.cmd again, or scripts\register-autoupdate-task.ps1.'
+        Write-Check 'OK' 'Auto-update task not configured' 'Manual updates are the default.'
     }
 }
 
@@ -746,7 +746,7 @@ function Write-FinalSummary {
         }
     }
 
-    Write-Host ("Auto-update task: {0} ({1})" -f $AutoUpdateTaskName, $taskStatus) -ForegroundColor Cyan
+    Write-Host ("Optional auto-update task: {0} ({1}; manual is default)" -f $AutoUpdateTaskName, $taskStatus) -ForegroundColor Cyan
 }
 
 Write-Host '==================================================' -ForegroundColor Cyan

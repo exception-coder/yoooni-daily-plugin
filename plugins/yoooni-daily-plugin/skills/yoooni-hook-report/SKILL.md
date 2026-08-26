@@ -20,7 +20,7 @@ description: 生成团队 vibecoding 周报。用户要求 hook 命中排行、w
 ```
 warn hook 命中(team-standards / project-coding-profiles)
    → 本地 ~/.kai-toolbox/hook-events.jsonl   (hooks/event-log.js，best-effort、只写本地)
-   → update-team-tools.ps1 同步(计划任务/SessionStart)
+   → update-team-tools.ps1 同步(人工运行或显式启用的计划任务)
    → \\IT01\版本更新\vibecoding\hook-events-<用户>-<机器>.jsonl   (每人一文件)
    → 本 skill 读整个目录聚合
 ```

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  全自动刷新公司团队套件，两部分都无需任何 slash / 手动操作：
+  用户触发后，一次刷新公司团队套件的两个部分：
     [MCP 仓] git pull project-domain-knowledge / cross-project-topology
              若 project-domain-knowledge 有更新 -> npm ci（有 lockfile）+ npm run build
              幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
@@ -9,7 +9,7 @@
              (team-standards / project-coding-profiles / yoooni-daily-plugin)，
              幂等(已最新则空跑)，有更新写 notice 提示「重启会话生效」。
   注：`claude plugin` 现已是完整 CLI，插件更新可全脚本化；早期"插件只能走 slash"的限制已不再适用。
-.NOTES 被 SessionStart hook(每日后台)、Windows 计划任务、update-team-tools skill 共用。
+.NOTES 由用户手动运行、显式注册的 Windows 计划任务或 update-team-tools skill 调用。
 #>
 param(
   [string]$WorkspaceDir,
@@ -93,7 +93,7 @@ function Sync-CodexMcpConfig($codexRoot, $configPath, $servers) {
   foreach ($name in $servers.Keys) {
     $block = New-CodexMcpBlock $name $servers[$name]
     $escaped = [regex]::Escape($name)
-    $pattern = '(?ms)^\[mcp_servers\.(?:"' + $escaped + '"|' + $escaped + ')\]\s*\r?\n.*?(?=^\[|\z)'
+    $pattern = '(?ms)^\[mcp_servers\.(?:"' + $escaped + '"|' + $escaped + ')\]\s*\r?\n.*?(?=^\[(?!mcp_servers\.(?:"' + $escaped + '"|' + $escaped + ')\.)|\z)'
     if ($text -match $pattern) {
       $current = $Matches[0]
       if ($current.Trim() -ne $block.Trim()) {
@@ -559,7 +559,7 @@ if ($knowledgeUpload.ToLowerInvariant() -ne 'off') {
 }
 
 # --- 自愈：若计划任务已存在，确保它指向稳定启动器(防插件自更新后版本化路径失效) ---
-# 仅校准已存在的任务，绝不擅自创建。本步在计划任务/SessionStart 两条触发路径下都会跑到。
+# 仅校准已存在的任务，绝不擅自创建。
 $reg = Join-Path $PSScriptRoot 'register-autoupdate-task.ps1'
 if (Test-Path $reg) {
   # register 用 Write-Host 输出，PS 5.1 下 2>&1 捕获不到，这里只记一条固定日志，副作用照常发生

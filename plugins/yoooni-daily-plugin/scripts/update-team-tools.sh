@@ -5,7 +5,7 @@
 #            内容有更新则幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
 #   [插件]   claude plugin marketplace update 刷源 -> claude plugin update <p>@<p> 逐个更新
 #            (team-standards / project-coding-profiles / yoooni-daily-plugin)，幂等
-# 被 SessionStart hook(session-autoupdate.js, darwin/linux 分支)、launchd 计划任务、更新 skill 共用。
+# 由用户手动运行、显式注册的 launchd 计划任务或更新 skill 调用。
 # 用法: bash update-team-tools.sh [-s user|local|project] [-w <workspaceDir>]
 set -u -o pipefail
 

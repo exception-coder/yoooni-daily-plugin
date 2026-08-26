@@ -3,16 +3,16 @@ name: yoooni-update-team-tools
 description: 用于更新或同步公司插件与 MCP，以及开启、关闭或检查定时自动更新。用户要求刷新团队工具或最新规范时使用。
 ---
 
-# 更新公司团队套件（AI 自动维护）
+# 更新公司团队套件（默认手动触发）
 
 ## 先讲清楚：能自动到什么程度
 
 | 层 | 内容 | 自动程度 |
 |---|---|---|
-| **MCP 仓**（project-domain-knowledge 引擎 / cross-project-topology 知识） | 业务知识、DDL、引擎代码 | ✅ **全自动**：SessionStart hook 每日后台 + Windows 计划任务，都会 `git pull` → 引擎有变化才 rebuild → 幂等重注册。MCP 跑本地文件，更新即生效 |
-| **插件**（team-standards / project-coding-profiles / yoooni-daily-plugin） | skill / hook 规则 | ✅ **全自动**：脚本走 `claude plugin marketplace update` 刷源 → `claude plugin update <plugin>@<marketplace>` 逐个更新（幂等，已最新则空跑）。**更新后重启会话生效**，notice 会提示 |
+| **MCP 仓**（project-domain-knowledge 引擎 / cross-project-topology 知识） | 业务知识、DDL、引擎代码 | ✅ **手动命令内自动完成**：用户触发后执行 `git pull` → 引擎有变化才 rebuild → 幂等重注册。MCP 跑本地文件，更新即生效 |
+| **插件**（team-standards / project-coding-profiles / yoooni-daily-plugin） | skill / hook 规则 | ✅ **手动命令内自动完成**：用户触发后脚本走 `claude plugin marketplace update` 刷源 → `claude plugin update <plugin>@<marketplace>` 逐个更新（幂等，已最新则空跑）。**更新后重启会话生效**，notice 会提示 |
 
-> 一句话：装一个 `yoooni-daily-plugin` 后，**MCP 与插件都零操作保持最新**；插件更新落地需重启一次会话。
+> 一句话：默认不会后台更新；用户明确说“更新公司套件”后，脚本一次完成 MCP 与插件同步。插件更新落地需重启一次会话。
 >
 > 背景：`claude plugin` 现已是完整 CLI（`install / update / marketplace …`），所以"插件只能在会话里跑 slash、脚本代不了"的旧限制**已不再适用**——本 skill 与脚本均已升级为全自动。
 
@@ -45,9 +45,9 @@ powershell -ExecutionPolicy Bypass -File "<plugin>\scripts\update-team-tools.ps1
 > ```
 > 注意：插件名必须带 `@marketplace` 全限定（裸名会报 `not found`）；更新后**重启会话**才加载新版。
 
-## B. 开启"会话外也定时刷新"（计划任务）
+## B. 可选：显式开启定时刷新（计划任务）
 
-每 4 小时自动刷新全套（即使没开 Claude Code），用户级任务、无需管理员：
+默认不创建任何计划任务。只有用户明确要求后台自动更新时，才运行下列注册命令；用户级任务无需管理员：
 
 **Windows（计划任务 schtasks）**
 ```powershell
@@ -68,19 +68,16 @@ bash "<plugin>/scripts/register-autoupdate-task.sh" --every-hours 4
 > 原因：`claude plugin` 缓存目录带版本号，本插件**自更新**后旧版本目录会被回收——若任务写死旧路径就会断掉。
 > **自愈**：`update-team-tools.ps1` 每次跑完都会校准计划任务（`register-autoupdate-task.ps1 -OnlyIfExists`，仅当任务已存在）；旧版本注册的"直指 update 脚本"的任务，会在下次刷新时被自动迁移到启动器。从没注册过计划任务的机器不受影响、也不会被擅自创建。
 
-## C. 自动更新开关（SessionStart hook，默认已开）
+## C. 默认行为：不自动更新
 
-每次开 Claude Code 会话，`hooks/session-autoupdate.js` 会：每天最多一次在后台刷新 MCP 仓 + 自动更新插件（不阻塞会话），并把"插件已更新、重启会话生效"提示带进上下文。
-
-| 想要 | 设环境变量 |
-|---|---|
-| 关闭自动更新 | `YOOONI_AUTOUPDATE=off` |
-| 下次开会话立即刷一次 | `YOOONI_AUTOUPDATE=now` |
-| 默认（每日一次） | 不设 / `=on` |
+- 不注册 `SessionStart` 自动更新 Hook。
+- 一键安装脚本默认不创建 Windows 计划任务或 macOS launchd 任务。
+- `YOOONI_AUTOUPDATE` 开关已停用；需要更新时运行 A 节命令。
+- 版本提醒 Hook 只比较版本并提示，不修改插件、MCP 或配置。
 
 ## 边界（诚实说明）
 
-- 插件 `update` 走 `claude plugin` CLI，脚本/计划任务可全自动代劳；唯一不能省的是**更新后重启会话**才会加载新版（CLI 自身也提示 `Restart to apply`）。
+- 插件 `update` 走 `claude plugin` CLI，用户手动触发脚本后可完成整套更新；唯一不能省的是**更新后重启会话**才会加载新版（CLI 自身也提示 `Restart to apply`）。
 - 插件名在 CLI 里必须带 `@marketplace` 全限定（如 `team-standards@team-standards`），裸名会 `not found`。
-- 首次安装本插件那一步仍建议在会话里 `/plugin marketplace add` + `/plugin install`（或用 `yoooni-install-team-tools` skill 一键引导）；装好后，后续更新即全自动。
+- 首次安装本插件那一步仍建议在会话里 `/plugin marketplace add` + `/plugin install`（或用 `yoooni-install-team-tools` skill 一键引导）；装好后，后续更新由用户明确触发。
 - `<plugin>` 为本插件安装路径（不确定就用脚本绝对路径）。

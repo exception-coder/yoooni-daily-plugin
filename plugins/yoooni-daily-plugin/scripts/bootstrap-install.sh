@@ -4,16 +4,16 @@
 # Homebrew + npm-global bins (harmless if a dir is absent). Mirrors the Windows .cmd fix.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.npm-global/bin:$PATH"
 # bootstrap-install.sh —— macOS/Linux「全新机器一键引导安装」（Gitee 源），对照 bootstrap-install.ps1。
-# 比 install-team-tools.sh 多做两件：(1) 克隆+安装本体 yoooni-daily-plugin；(2) 注册定时自动更新(launchd)。
+# 比 install-team-tools.sh 多做一件：克隆+安装本体 yoooni-daily-plugin；定时更新仅在显式传参时注册。
 # 中间「关联插件 + MCP」委托 install-team-tools.sh（幂等、已装跳过）。
 # 用法: bash bootstrap-install.sh [-w <workspaceDir>] [-s user|local|project] [--every-hours 4]
 set -u
-WORKSPACE_DIR=""; SCOPE="user"; EVERY_HOURS=4; GITEE="https://gitee.com/wyoooni"
+WORKSPACE_DIR=""; SCOPE="user"; EVERY_HOURS=0; GITEE="https://gitee.com/wyoooni"
 while [ $# -gt 0 ]; do
   case "$1" in
     -w|--workspace) WORKSPACE_DIR="${2:-}"; shift 2 ;;
     -s|--scope) SCOPE="${2:-user}"; shift 2 ;;
-    --every-hours) EVERY_HOURS="${2:-4}"; shift 2 ;;
+    --every-hours) EVERY_HOURS="${2:-0}"; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -35,7 +35,8 @@ WORKSPACE_DIR="$resolved"; printf '%s' "$WORKSPACE_DIR" > "$CFG"; mkdir -p "$WOR
 echo "=================================================="
 echo " 公司团队套件【全新机器一键引导】(Gitee 源)"
 echo "=================================================="
-echo "工作区目录: $WORKSPACE_DIR ; 安装范围: $SCOPE ; 定时更新: 每 $EVERY_HOURS 小时"
+if [ "$EVERY_HOURS" -gt 0 ]; then schedule_text="每 $EVERY_HOURS 小时（显式启用）"; else schedule_text="未启用（默认手动更新）"; fi
+echo "工作区目录: $WORKSPACE_DIR ; 安装范围: $SCOPE ; 定时更新: $schedule_text"
 
 # --- 1) 本体 yoooni-daily-plugin：克隆 + 安装插件 ---
 self="yoooni-daily-plugin"; self_dir="$WORKSPACE_DIR/$self"; self_url="$GITEE/$self.git"; self_ref="${self}@${self}"
@@ -58,15 +59,15 @@ installer="$plugin_root/skills/yoooni-install-team-tools/install-team-tools.sh"
 if [ -f "$installer" ]; then bash "$installer" -w "$WORKSPACE_DIR" -s "$SCOPE"
 else echo "  [warn] 未找到 $installer（本体克隆可能失败 / 布局变更），检查网络后重跑。"; fi
 
-# --- 3) 注册定时自动更新（launchd，仅 macOS）---
-echo ""; echo "[3/3] 注册定时自动更新任务..."
+# --- 3) 仅在显式指定周期时注册定时更新（launchd，仅 macOS）---
+echo ""; echo "[3/3] 检查可选定时更新任务..."
 register="$plugin_root/scripts/register-autoupdate-task.sh"
-if [ "$EVERY_HOURS" -le 0 ]; then echo "  (every-hours<=0，跳过)"
+if [ "$EVERY_HOURS" -le 0 ]; then echo "  默认不注册；后续请手动运行更新 skill。"
 elif [ "$(uname -s)" != "Darwin" ]; then echo "  (非 macOS，跳过 launchd；Linux 请用 cron 调 ~/.kai-toolbox/run-update.sh)"
 elif [ -f "$register" ]; then bash "$register" --every-hours "$EVERY_HOURS"
 else echo "  [warn] 未找到 $register，跳过。"; fi
 
 echo ""; echo "================== 引导完成 =================="
 echo "插件安装后需【重启 Claude Code 会话】生效。"
-echo "保持最新：launchd 每 $EVERY_HOURS 小时自动跑；开 Claude Code 会话也会触发 SessionStart 刷新。"
+echo "后续更新默认由用户手动触发，不会在会话启动时或后台自动更新。"
 echo "=================================================="

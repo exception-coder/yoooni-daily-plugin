@@ -11,9 +11,9 @@ description: 用于从 Gitee 一键安装公司团队插件和 MCP。用户要�
 > **已安装的一律跳过，不重装、不更新。** 需要更新请改用 `yoooni-update-team-tools`（『更新公司套件』），
 > 它会 `git pull` + 重建 MCP + `claude plugin update`。**别用安装脚本来"更新"。**
 
-## 全新机器：一键引导脚本（含本体 + 定时自动更新）
+## 全新机器：一键引导脚本（含本体，默认不自动更新）
 
-`install-team-tools.ps1` 跑在**本体插件内部**，所以装不了本体自己、也不注册定时更新。**全新机器**请用引导脚本 `scripts/bootstrap-install.ps1`——它在 install-team-tools.ps1 之上多做两件事：(1) 克隆 + 安装**本体 `yoooni-daily-plugin`**；(2) 注册**定时自动更新**任务（默认每 1 小时）；中间的「关联插件 + MCP」直接委托 install-team-tools.ps1（幂等、已装跳过），不重复实现。
+`install-team-tools.ps1` 跑在**本体插件内部**，所以装不了本体自己。**全新机器**请用引导脚本 `scripts/bootstrap-install.ps1`——它在 install-team-tools.ps1 之上多做一件事：克隆 + 安装**本体 `yoooni-daily-plugin`**；中间的「关联插件 + MCP」直接委托 install-team-tools.ps1（幂等、已装跳过），不重复实现。引导脚本默认不注册定时任务。
 
 发给同事（Gitee 仓库私有，raw 链接 403，故走「发文件 + 双击」模式）：把 `scripts/` 下这两对文件打包发过去，双击 `.cmd` 即可——
 - 安装：`team-tools-install.cmd` + `bootstrap-install.ps1`（同一文件夹）
@@ -26,17 +26,17 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap-install.ps1
 ```
 
 - 已装好本体的机器，只想补装关联工具 / 重复跑安装 → 仍用下面的 `install-team-tools.ps1`（幂等）。
-- 只改更新周期（不重装）→ `scripts\register-autoupdate-task.ps1 -EveryHours <小时>`（内容稳定后建议从 1 改回 2~4）。
-- 定时任务是「会话外也保持最新」的兜底；「开 Claude Code 即刷新」由 SessionStart hook 负责，二者互补。
+- 默认更新方式 → 用户明确运行 `yoooni-update-team-tools` 或 `scripts\update-team-tools.ps1`。
+- 只有用户明确要求自动更新时，才运行 `scripts\register-autoupdate-task.ps1 -EveryHours <小时>`。
 
 ### macOS / Linux（用 .sh，与上面 .ps1 一一对应）
 
 按操作系统选脚本：Windows 用 `.ps1` / `.cmd`，**macOS / Linux 用同名 `.sh`**（命令、状态文件 `~/.kai-toolbox/*`、Gitee 源完全一致）。
 
-- 全新机器一键引导：`bash scripts/bootstrap-install.sh`（克隆+装本体 + 委托 install-team-tools.sh + 注册定时任务）。macOS 也可双击 `scripts/team-tools-install.command`（首次需 `chmod +x` 或右键→打开）。
+- 全新机器一键引导：`bash scripts/bootstrap-install.sh`（克隆+装本体 + 委托 install-team-tools.sh，默认不注册定时任务）。macOS 也可双击 `scripts/team-tools-install.command`（首次需 `chmod +x` 或右键→打开）。
 - 已装本体、只补装关联工具：`bash skills/yoooni-install-team-tools/install-team-tools.sh`。
 - 卸载：`bash scripts/uninstall-team-tools.sh`（或双击 `team-tools-uninstall.command`）。
-- 定时任务：macOS 用 **launchd**（`bash scripts/register-autoupdate-task.sh --every-hours 4`，写 `~/Library/LaunchAgents/com.yoooni.team-tools-autoupdate.plist`）；Linux 无 launchd，请用 cron 调 `~/.kai-toolbox/run-update.sh`。SessionStart hook 在 macOS/Linux 下自动跑 `.sh`，与 Windows 对等。
+- 可选定时任务：仅在用户明确要求时，macOS 用 **launchd**（`bash scripts/register-autoupdate-task.sh --every-hours 4`，写 `~/Library/LaunchAgents/com.yoooni.team-tools-autoupdate.plist`）；Linux 无 launchd，请用 cron 调 `~/.kai-toolbox/run-update.sh`。
 - 参数风格：`.sh` 用 `-w <workspaceDir>` / `-s user|local|project` / `--every-hours N`（对应 .ps1 的 `-WorkspaceDir` / `-Scope` / `-EveryHours`）。
 
 ## AI 触发本 skill 时的判断逻辑

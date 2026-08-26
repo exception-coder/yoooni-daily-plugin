@@ -17,8 +17,10 @@ test('isolated installed layout discovers and executes every configured hook', (
 
     const hooksPath = path.join(fixture.pluginCopy, 'hooks', 'hooks.json');
     const hooks = readJson(hooksPath);
+    assert.equal(Object.hasOwn(hooks.hooks, 'SessionStart'), false);
     const commands = configuredCommands(hooks);
     assert.ok(commands.length > 0, 'at least one hook command must be configured');
+    assert.equal(commands.some((command) => command.includes('session-autoupdate')), false);
 
     for (const command of commands) {
       const script = resolveNodeScript(command, fixture.pluginCopy);
@@ -118,7 +120,6 @@ function safeHookEnvironment(installedRoot) {
     PCP_FRONTEND_HOOK: 'off',
     PCP_CROSSMODULE_HOOK: 'off',
     PROJECT_CODING_PROFILES_VERSION_REMINDER: 'off',
-    YOOONI_AUTOUPDATE: 'off',
     YOOONI_VERSION_REMINDER: 'off',
   };
 }

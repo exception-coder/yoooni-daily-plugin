@@ -4,7 +4,7 @@
           关键：任务指向【稳定启动器】%USERPROFILE%\.kai-toolbox\run-update.ps1，
           而非版本化的 update-team-tools.ps1——后者随插件自更新换目录会让任务断掉。
           启动器运行时再定位最新版脚本。WorkspaceDir 由 update-team-tools.ps1 自动定位。
-          "开 Claude Code 即刷新"由 SessionStart hook 负责，二者互补。
+          本脚本只在用户明确运行时注册计划任务；插件默认采用手动更新。
 .PARAMETER OnlyIfExists 自愈模式：仅当任务已存在时才校准(刷新启动器 + 必要时把任务迁到启动器)；
           从未注册过则什么都不做(不擅自给用户创建任务)。由 update-team-tools.ps1 末尾调用。
 .EXAMPLE  powershell -ExecutionPolicy Bypass -File .\register-autoupdate-task.ps1
