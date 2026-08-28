@@ -22,6 +22,34 @@ const shareDir = (args.find((a) => !a.startsWith('--'))) || '\\\\IT01\\版本更
 const daysArg = args.find((a) => a.startsWith('--days='));
 const days = daysArg ? parseInt(daysArg.split('=')[1], 10) : 7;
 const asJson = args.includes('--json');
+const REQUIRED_STRING_FIELDS = ['user', 'host', 'plugin', 'hook', 'rule', 'tool', 'file'];
+const VALID_MODES = new Set(['warn', 'block']);
+
+function normalizeHookEvent(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const legacy = value.schemaVersion === undefined;
+  if (!legacy && value.schemaVersion !== 1) return null;
+  if (typeof value.ts !== 'string' || Number.isNaN(Date.parse(value.ts))) return null;
+  if (!VALID_MODES.has(value.mode)) return null;
+  for (const field of REQUIRED_STRING_FIELDS) {
+    if (typeof value[field] !== 'string' || value[field].trim() === '') return null;
+  }
+  return {
+    event: {
+      schemaVersion: 1,
+      ts: value.ts,
+      user: value.user.trim(),
+      host: value.host.trim(),
+      plugin: value.plugin.trim(),
+      hook: value.hook.trim(),
+      rule: value.rule.trim(),
+      mode: value.mode,
+      tool: value.tool.trim(),
+      file: value.file.trim(),
+    },
+    legacy,
+  };
+}
 
 function readEvents(dir) {
   let files;
@@ -33,16 +61,28 @@ function readEvents(dir) {
     process.exit(1);
   }
   const events = [];
+  let invalidRecords = 0;
+  let legacyRecords = 0;
   for (const f of files) {
     let text;
     try { text = fs.readFileSync(path.join(dir, f), 'utf8'); } catch (_) { continue; }
     for (const line of text.split(/\r?\n/)) {
       const s = line.trim();
       if (!s) continue;
-      try { events.push(JSON.parse(s)); } catch (_) { /* 跳过坏行 */ }
+      try {
+        const normalized = normalizeHookEvent(JSON.parse(s));
+        if (!normalized) {
+          invalidRecords += 1;
+          continue;
+        }
+        if (normalized.legacy) legacyRecords += 1;
+        events.push(normalized.event);
+      } catch (_) {
+        invalidRecords += 1;
+      }
     }
   }
-  return events;
+  return { events, invalidRecords, legacyRecords };
 }
 
 function withinDays(ev, n) {
@@ -70,7 +110,8 @@ function printTable(title, rows, colName) {
   for (const [k, v] of rows) console.log(`  ${String(k).padEnd(w)}  ${v}`);
 }
 
-const all = readEvents(shareDir);
+const readResult = readEvents(shareDir);
+const all = readResult.events;
 const events = all.filter((e) => withinDays(e, days));
 
 const agg = {
@@ -78,6 +119,8 @@ const agg = {
   days,
   totalAll: all.length,
   total: events.length,
+  invalidRecords: readResult.invalidRecords,
+  legacyRecords: readResult.legacyRecords,
   byRule: tally(events, 'rule'),
   byUser: tally(events, 'user'),
   byMode: tally(events, 'mode'),
@@ -91,6 +134,7 @@ if (asJson) {
   console.log(`# hook 命中周报`);
   console.log(`数据源：${shareDir}`);
   console.log(`范围：最近 ${days || '全部'} 天　|　事件数：${agg.total}（全量 ${agg.totalAll}）`);
+  console.log(`契约：legacy v1 ${agg.legacyRecords} 条　|　跳过无效记录 ${agg.invalidRecords} 条`);
   printTable('规则命中 Top（决定升不升 block 的依据）', agg.byRule, '规则');
   printTable('谁命中最多（谁常踩规范）', agg.byUser, '用户');
   printTable('warn vs block', agg.byMode, '模式');

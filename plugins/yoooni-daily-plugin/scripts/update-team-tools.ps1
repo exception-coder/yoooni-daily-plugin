@@ -291,7 +291,7 @@ function Sync-KiroSteering($kiroRoot, $workspaceDir, $pluginRepos) {
   if (-not (Test-Path $kiroRoot)) { return $null }
   $targetDir = Join-Path $kiroRoot 'steering'
   New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
-  $target = Join-Path $targetDir 'yoooni-team-tools.md'
+  $target = Join-Path $targetDir 'team-tools-maintenance.md'
   $lines = @(
     '# Yoooni Team Tools',
     '',

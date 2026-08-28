@@ -8,7 +8,7 @@ This is the **source repo of a Claude Code plugin** (`yoooni-daily-plugin`). It 
 
 The plugin ships **Skills** under `skills/*/SKILL.md` — natural-language-triggered playbooks (Claude routes by the `description:` frontmatter, no slash command needed).
 
-It also ships a **read-only plugin-version reminder hook** (`hooks/hooks.json`) + **manual update scripts** (`scripts/`). The plugin does not update plugins or MCP servers on `SessionStart`, and bootstrap installation does not register a schedule by default. Users explicitly run `yoooni-update-team-tools` or `scripts/update-team-tools.*`; `scripts/register-autoupdate-task.*` remains an opt-in capability for users who deliberately want background updates. An existing optional task is only self-healed with `-OnlyIfExists`, never created implicitly. 提示词信号上传另需显式 `YOOONI_PROMPT_SIGNAL_UPLOAD=on`。`.ps1` 须带 UTF-8 BOM（见下）。
+It also ships a **read-only plugin-version reminder hook** (`hooks/hooks.json`) + repository maintenance scripts (`scripts/`). Installation and updates are scripts, not Skills. The plugin does not update plugins or MCP servers on `SessionStart`, and bootstrap installation does not register a schedule by default. Users explicitly run `scripts/update-team-tools.*`; `scripts/register-autoupdate-task.*` remains opt-in. An existing optional task is only self-healed with `-OnlyIfExists`, never created implicitly. 提示词信号上传另需显式 `YOOONI_PROMPT_SIGNAL_UPLOAD=on`。`.ps1` 须带 UTF-8 BOM（见下）。
 
 > 历史背景：`claude plugin` 早期不是 CLI 子命令，插件只能在会话里走 `/plugin` slash；现已是完整 CLI（`install/update/marketplace`），脚本可全自动代劳——旧文档中"插件更新需手敲 slash / 脚本代不了"的说法已废弃。插件名在 CLI 中须带 `@marketplace` 全限定（裸名报 `not found`）。
 
@@ -48,16 +48,9 @@ if (($v1 -ne $v2) -or ($v1 -ne $v3)) { Write-Error "version mismatch: claude plu
    ---
    ```
 2. Bump version in **both** `plugin.json` and `marketplace.json`.
-3. Update `README.md` in **4 places**:
+3. Update `README.md` 中的 Skill 计数、清单和边界说明：
 
-| README.md 位置 | 操作 |
-|---|---|
-| 顶部 "包含 **N 个 Skill**" 计数 | `+1` |
-| 顶部 skill 表格 | 追加一行 |
-| "Skills 一览" 章节 | 追加详细段 |
-| "目录结构" 章节 | 追加目录条目 |
-
-自检：`Select-String -Pattern '<skill-name>' README.md | Measure-Object | Select -ExpandProperty Count` ≥ 4
+公共 Skill 必须是 Yoooni 日常协作的稳定用户意图；项目专属能力和仓库维护脚本不得新增为 Skill。
 
 ## Version bump convention
 

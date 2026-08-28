@@ -27,23 +27,16 @@ jobs:
             }
           }
           if ($failed) { exit 1 }
-      - name: Run production-log security self-test
-        shell: powershell
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -File
-          plugins/yoooni-daily-plugin/skills/yoooni-prod-log-query/query-prod-log.ps1
-          -SelfTest
       - name: Run update mutex tests
         shell: powershell
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass -File
           plugins/yoooni-daily-plugin/scripts/tests/update-lock.tests.ps1
-      - name: Run DDL sync tests
+      - name: Run cache version tests
         shell: powershell
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass -File
-          plugins/yoooni-daily-plugin/scripts/tests/ddl-sync.tests.ps1
-
+          plugins/yoooni-daily-plugin/scripts/tests/check-team-tools.tests.ps1
   shell:
     name: Shell syntax
     runs-on: ubuntu-latest
@@ -69,8 +62,6 @@ jobs:
       - name: Run hook tests
         working-directory: plugins/yoooni-daily-plugin/hooks
         run: npm test
-      - name: Run onboarding pipeline tests
-        run: node --test plugins/yoooni-daily-plugin/scripts/tests/onboard-pipeline.test.mjs
 
   version-sync:
     name: plugin manifest versions in sync

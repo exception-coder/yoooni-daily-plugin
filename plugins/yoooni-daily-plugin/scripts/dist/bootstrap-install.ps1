@@ -2,7 +2,7 @@
 .SYNOPSIS
   公司团队套件「全新机器一键引导安装」（全部走 Gitee 源）。
 
-  与 skills\yoooni-install-team-tools\install-team-tools.ps1 的区别：
+  与 scripts\install-team-tools.ps1 的区别：
     install-team-tools.ps1 跑在【本体插件内部】，装不了本体自己；
     本脚本是【零依赖引导】，会连「本体插件 yoooni-daily-plugin」自身一并克隆 + 安装。
     中间的「关联插件 + MCP」直接委托 install-team-tools.ps1（幂等、已装跳过），不重复实现。
@@ -121,7 +121,7 @@ else { Write-Host '  (claude 缺失，跳过本体插件安装)' -ForegroundColo
 # --- 2) 关联插件 + MCP：委托本体内的 install-team-tools.ps1（幂等）---
 Write-Host ''
 Write-Host '[2/3] 关联插件 + MCP（委托 install-team-tools.ps1）...' -ForegroundColor Green
-$installer = Join-Path $selfDir 'skills\yoooni-install-team-tools\install-team-tools.ps1'
+$installer = Join-Path $selfDir 'scripts\install-team-tools.ps1'
 if (Test-Path $installer) {
     & powershell -NoProfile -ExecutionPolicy Bypass -File $installer -WorkspaceDir $WorkspaceDir -Scope $Scope
 }
@@ -142,6 +142,6 @@ Write-Host ''
 Write-Host '================== 引导完成 ==================' -ForegroundColor Cyan
 Write-Host '插件安装后需【重启 Claude Code 会话】生效（或 /reload-plugins）。' -ForegroundColor Cyan
 Write-Host '后续更新默认由用户手动触发，不会在会话启动时或后台自动更新。' -ForegroundColor Cyan
-Write-Host '手动更新：『更新公司套件』skill(yoooni-update-team-tools) 或 scripts\update-team-tools.ps1。' -ForegroundColor Cyan
+Write-Host '手动更新：运行 scripts\update-team-tools.ps1。' -ForegroundColor Cyan
 Write-Host '确需定时更新时，显式运行 scripts\register-autoupdate-task.ps1 -EveryHours <小时>。' -ForegroundColor DarkCyan
 Write-Host '==============================================' -ForegroundColor Cyan

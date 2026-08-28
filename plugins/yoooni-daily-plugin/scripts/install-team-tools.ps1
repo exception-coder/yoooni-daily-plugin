@@ -2,7 +2,7 @@
 .SYNOPSIS
   公司团队工具「一键首次安装」（全部走 Gitee 源）。
   本脚本只负责【首次安装缺失的部分】：已安装的一律跳过，不重装、不更新——
-  需要更新请用『更新公司套件』skill(yoooni-update-team-tools) 或 scripts\update-team-tools.ps1。
+  需要更新请用 scripts\update-team-tools.ps1。
     - 仓库：缺失才 git clone（已存在则跳过，不 pull）
     - MCP ：未注册才 build + claude mcp add（已注册则跳过）
     - 插件：未安装才 claude plugin marketplace add + claude plugin install（已安装则跳过）
@@ -261,7 +261,7 @@ function Sync-KiroSteering($kiroRoot, $workspaceDir, $pluginRepos) {
     if (-not (Test-Path $kiroRoot)) { return $null }
     $targetDir = Join-Path $kiroRoot 'steering'
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
-    $target = Join-Path $targetDir 'yoooni-team-tools.md'
+    $target = Join-Path $targetDir 'team-tools-maintenance.md'
     $lines = @(
         '# Yoooni Team Tools',
         '',
@@ -547,7 +547,7 @@ if ($haveRepos.Count -or $haveMcp.Count -or $havePlugins.Count) {
     if ($haveMcp.Count)     { Write-Host ("  MCP  : " + ($haveMcp -join ', ')) }
     if ($havePlugins.Count) { Write-Host ("  插件 : " + ($havePlugins -join ', ')) }
     Write-Host ""
-    Write-Host ">> 需要更新？别重跑安装——用『更新公司套件』skill(yoooni-update-team-tools)，" -ForegroundColor Yellow
+    Write-Host ">> 需要更新？别重跑安装——用 scripts\update-team-tools.ps1，" -ForegroundColor Yellow
     Write-Host "  或直接跑 scripts\update-team-tools.ps1（git pull + 重建 MCP + claude plugin update）。" -ForegroundColor Yellow
 }
 if ($newPlugins.Count) {

@@ -210,7 +210,7 @@ sync_kiro_steering() {
     printf 'project-coding-profiles: %s\n' "$(find_repo_dir project-coding-profiles)"
     printf 'yoooni-daily-plugin: %s\n\n' "$(find_repo_dir yoooni-daily-plugin)"
     printf 'Before editing code, follow the relevant coding standards, project profile, encoding profile, and registered MCP knowledge sources.\n'
-  } > "$HOME/.kiro/steering/yoooni-team-tools.md"
+  } > "$HOME/.kiro/steering/team-tools-maintenance.md"
   echo "  + Kiro: steering synced"
 }
 

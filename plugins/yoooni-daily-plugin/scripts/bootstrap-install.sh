@@ -55,7 +55,7 @@ echo ""; echo "[2/3] 关联插件 + MCP（委托 install-team-tools.sh）..."
 # 兼容两种仓库布局：新版子目录布局 plugins/yoooni-daily-plugin/ 优先，旧版根布局兜底。
 plugin_root="$self_dir"
 if [ -f "$self_dir/plugins/yoooni-daily-plugin/.claude-plugin/plugin.json" ]; then plugin_root="$self_dir/plugins/yoooni-daily-plugin"; fi
-installer="$plugin_root/skills/yoooni-install-team-tools/install-team-tools.sh"
+installer="$plugin_root/scripts/install-team-tools.sh"
 if [ -f "$installer" ]; then bash "$installer" -w "$WORKSPACE_DIR" -s "$SCOPE"
 else echo "  [warn] 未找到 $installer（本体克隆可能失败 / 布局变更），检查网络后重跑。"; fi
 

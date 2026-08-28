@@ -25,7 +25,7 @@ warn hook 命中(team-standards / project-coding-profiles)
    → 本 skill 读整个目录聚合
 ```
 
-事件字段：`ts / user / host / plugin / hook / rule / mode(warn|block) / tool / file`。
+事件字段：`schemaVersion(1) / ts / user / host / plugin / hook / rule / mode(warn|block) / tool / file`。历史无 `schemaVersion` 的记录按 legacy v1 读取；未知版本或非法字段会被跳过，并在报告中显示数量。
 
 ## 怎么跑
 

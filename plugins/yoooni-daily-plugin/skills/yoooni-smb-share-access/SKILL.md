@@ -5,7 +5,7 @@ description: 当用户无法访问 IT01 共享，遇到网络凭据、Guest 登�
 
 # Yoooni 内网共享 IT01 免密访问处理流程
 
-> 🧭 **Yoooni 入职链路**：① 拉项目文档 [yoooni-onboard-init](../yoooni-onboard-init/SKILL.md) → **② 连内网共享（本步）** → ③ 拉源码+搭环境 [yoooni-idea-import](../yoooni-idea-import/SKILL.md) → ④ 日常启动 [yoooni-start](../yoooni-start/SKILL.md)
+> 本 Skill 只处理 IT01 共享访问。入职资料、源码导入、IDE 配置和启动方式遵循公司或目标项目自身文档。
 
 适用场景：访问 `\\IT01` 或 `\\IT01\版本更新` 时，Windows 弹出**"输入网络凭据"**，提示用户名或密码不正确。
 

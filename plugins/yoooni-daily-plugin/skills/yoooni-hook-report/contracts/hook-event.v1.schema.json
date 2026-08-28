@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kai-toolbox:hook-event:v1",
+  "title": "Kai Toolbox Hook Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "ts",
+    "user",
+    "host",
+    "plugin",
+    "hook",
+    "rule",
+    "mode",
+    "tool",
+    "file"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "user": {
+      "type": "string",
+      "minLength": 1
+    },
+    "host": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plugin": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hook": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "enum": [
+        "warn",
+        "block"
+      ]
+    },
+    "tool": {
+      "type": "string",
+      "minLength": 1
+    },
+    "file": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
+

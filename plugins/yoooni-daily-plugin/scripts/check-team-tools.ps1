@@ -7,7 +7,8 @@
   MCP server connectivity, plugin cache manifests, and optional auto-update task state.
 #>
 param(
-    [string]$WorkspaceDir
+    [string]$WorkspaceDir,
+    [switch]$FunctionsOnly
 )
 
 $ErrorActionPreference = 'Continue'
@@ -35,7 +36,7 @@ $CodexConfigFile = Join-Path $env:USERPROFILE '.codex\config.toml'
 $CursorConfigFile = Join-Path $env:USERPROFILE '.cursor\mcp.json'
 $CursorRulesDir = Join-Path $env:USERPROFILE '.cursor\rules'
 $KiroConfigFile = Join-Path $env:USERPROFILE '.kiro\settings\mcp.json'
-$KiroSteeringFile = Join-Path $env:USERPROFILE '.kiro\steering\yoooni-team-tools.md'
+$KiroSteeringFile = Join-Path $env:USERPROFILE '.kiro\steering\team-tools-maintenance.md'
 $WorkspaceConfigFile = Join-Path $env:USERPROFILE '.kai-toolbox\workspace.path'
 
 function Write-Header($Text) {
@@ -67,6 +68,42 @@ function Invoke-TextCommand([scriptblock]$Command) {
     catch {
         return $_.Exception.Message
     }
+}
+
+function Read-PluginManifestVersion($ManifestPath) {
+    if (-not (Test-Path -LiteralPath $ManifestPath)) { return $null }
+    try {
+        return (Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json).version
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-LatestCodexCacheVersion($CacheRoot) {
+    if (-not (Test-Path -LiteralPath $CacheRoot)) { return $null }
+    $latest = Get-ChildItem -Path $CacheRoot -Filter 'plugin.json' -Recurse -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match '\\\.codex-plugin\\plugin\.json$' } |
+        ForEach-Object {
+            $cacheVersion = Read-PluginManifestVersion $_.FullName
+            try {
+                if ($cacheVersion) {
+                    [pscustomobject]@{ Version = $cacheVersion; ParsedVersion = [version]$cacheVersion }
+                }
+            }
+            catch {}
+        } |
+        Sort-Object ParsedVersion -Descending |
+        Select-Object -First 1
+    if ($latest) { return $latest.Version }
+    return $null
+}
+
+function Get-CodexCacheState($ExpectedVersion, $CacheVersion) {
+    if (-not $CacheVersion) { return 'missing' }
+    if (-not $ExpectedVersion) { return "version $CacheVersion; source manifest missing" }
+    if ($CacheVersion -eq $ExpectedVersion) { return "current $CacheVersion" }
+    return "stale $CacheVersion; expected $ExpectedVersion"
 }
 
 function Resolve-WorkspaceDir {
@@ -491,17 +528,14 @@ function Get-CodexPluginRows($ResolvedWorkspaceDir) {
         $pluginPattern = '(?ms)^\[plugins\."' + [regex]::Escape($pluginRef) + '"\]\s*\r?\n.*?enabled\s*=\s*true.*?(?=^\[|\z)'
         $config = if ($configText -match $marketPattern -and $configText -match $pluginPattern) { 'enabled' } else { 'missing' }
 
+        $sourceManifestPath = Join-Path $ResolvedWorkspaceDir ("{0}\plugins\{0}\.codex-plugin\plugin.json" -f $name)
+        $expectedVersion = Read-PluginManifestVersion $sourceManifestPath
+
         $cacheRoot = Join-Path $codexRoot ("plugins\cache\{0}\{0}" -f $name)
-        $manifest = $null
-        if (Test-Path -LiteralPath $cacheRoot) {
-            $manifest = Get-ChildItem -Path $cacheRoot -Filter 'plugin.json' -Recurse -Force -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -match '\\\.codex-plugin\\plugin\.json$' } |
-                Sort-Object FullName -Descending |
-                Select-Object -First 1
-        }
-        $cache = if ($manifest) { 'ok' } else { 'missing' }
-        $result = if ($config -eq 'enabled' -and $cache -eq 'ok') { 'OK' } else { 'FAIL' }
-        $action = if ($result -eq 'OK') { 'Ready' } else { 'Run team-tools-install.cmd or update-team-tools.ps1' }
+        $cacheVersion = Get-LatestCodexCacheVersion $cacheRoot
+        $cache = Get-CodexCacheState $expectedVersion $cacheVersion
+        $result = if ($config -eq 'enabled' -and $expectedVersion -and $cacheVersion -eq $expectedVersion) { 'OK' } else { 'FAIL' }
+        $action = if ($result -eq 'OK') { 'Ready' } else { 'Run update-team-tools.ps1, then restart Codex' }
 
         [pscustomobject]@{
             Plugin = $pluginRef
@@ -540,7 +574,7 @@ function Get-CursorRuleRows($ResolvedWorkspaceDir) {
     }
 
     $sourceRulesDir = Join-Path $ResolvedWorkspaceDir 'project-coding-profiles\plugins\project-coding-profiles\.cursor\rules'
-    $ruleNames = @('encoding-guard.mdc', 'module-scaffold.mdc', 'url-locate.mdc')
+    $ruleNames = @('encoding-guard.mdc')
     $rows = foreach ($ruleName in $ruleNames) {
         $target = Join-Path $CursorRulesDir ("yoooni-{0}" -f $ruleName)
         $source = Join-Path $sourceRulesDir $ruleName
@@ -600,7 +634,7 @@ function Get-KiroSteeringRows($ResolvedWorkspaceDir) {
 
     if (-not (Test-Path -LiteralPath $KiroSteeringFile)) {
         return @([pscustomobject]@{
-            Steering = 'yoooni-team-tools.md'
+            Steering = 'team-tools-maintenance.md'
             Status = 'missing'
             Result = 'FAIL'
             Action = 'Run team-tools-install.cmd or update-team-tools.ps1'
@@ -612,7 +646,7 @@ function Get-KiroSteeringRows($ResolvedWorkspaceDir) {
     $result = if ($status -eq 'current') { 'OK' } else { 'FAIL' }
     $action = if ($result -eq 'OK') { 'Ready' } else { 'Run update-team-tools.ps1' }
     return @([pscustomobject]@{
-        Steering = 'yoooni-team-tools.md'
+        Steering = 'team-tools-maintenance.md'
         Status = $status
         Result = $result
         Action = $action
@@ -748,6 +782,8 @@ function Write-FinalSummary {
 
     Write-Host ("Optional auto-update task: {0} ({1}; manual is default)" -f $AutoUpdateTaskName, $taskStatus) -ForegroundColor Cyan
 }
+
+if ($FunctionsOnly) { return }
 
 Write-Host '==================================================' -ForegroundColor Cyan
 Write-Host ' Company Team Tools - One-click Check' -ForegroundColor Cyan

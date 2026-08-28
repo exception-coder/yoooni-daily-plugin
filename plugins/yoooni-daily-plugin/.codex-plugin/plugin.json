@@ -1,7 +1,7 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "0.29.0",
-  "description": "Yoooni daily-work toolbox for Claude Code and Codex: 14 skills including domain-knowledge bootstrap, project onboarding, safe Oracle DDL snapshot synchronization, environment setup, manually triggered team-tool updates, production-log troubleshooting, task spaces, and hook reporting. Includes a read-only version reminder hook.",
+  "version": "1.0.0",
+  "description": "Yoooni daily assistant with 2 skills for IT01 SMB access recovery and team hook reporting.",
   "author": {
     "name": "Zhang Kai",
     "email": "ping.yang@kpay-group.com"
@@ -9,32 +9,17 @@
   "license": "MIT",
   "keywords": [
     "yoooni",
-    "svn",
-    "onboard",
     "smb",
     "network-share",
-    "idea",
-    "resin",
-    "redis",
-    "startup",
-    "daily-tools",
-    "team-standards",
-    "mcp",
-    "gitee",
-    "install",
-    "prod-log",
-    "troubleshoot",
-    "taskspace",
-    "junction",
-    "symlink",
-    "ddl",
-    "oracle-schema"
+    "hook-report",
+    "team-feedback",
+    "troubleshoot"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Yoooni Daily Plugin",
-    "shortDescription": "Yoooni \u56e2\u961f\u65e5\u5e38\u5de5\u5177\u7bb1\uff1a\u5165\u804c\u3001\u542f\u52a8\u3001\u5b89\u88c5/\u66f4\u65b0\u516c\u53f8\u5957\u4ef6\u3001\u751f\u4ea7\u6392\u969c\u3001\u4efb\u52a1\u7a7a\u95f4\u3002",
-    "longDescription": "Yoooni \u56e2\u961f\u65e5\u5e38\u5de5\u4f5c\u63d2\u4ef6\uff0c14 \u4e2a Skill \u8986\u76d6\u4e1a\u52a1\u771f\u7406\u521d\u59cb\u5316\u3001\u9879\u76ee onboarding\u3001Oracle DDL \u5feb\u7167\u540c\u6b65\u3001ERP \u81ea\u52a8\u5f00\u53d1\u3001\u5f00\u53d1\u5de5\u4f5c\u53f0\u3001\u5165\u804c\u4e0e\u73af\u5883\u642d\u5efa\u3001\u65e5\u5e38\u542f\u52a8\u3001\u56e2\u961f\u5de5\u5177\u624b\u52a8\u66f4\u65b0\u3001\u751f\u4ea7\u65e5\u5fd7\u6392\u969c\u3001\u4efb\u52a1\u7a7a\u95f4\u548c hook \u5468\u62a5\uff1b\u5185\u7f6e\u53ea\u8bfb\u7248\u672c\u63d0\u9192 hook\u3002Works across Claude Code and Codex.",
+    "shortDescription": "Yoooni \u65e5\u5e38\u8f85\u52a9\uff1aIT01 SMB \u8bbf\u95ee\u4e0e Hook \u56e2\u961f\u53cd\u9988\u3002",
+    "longDescription": "Yoooni daily assistance with two narrowly scoped skills: IT01 SMB access recovery and team hook reporting. Project onboarding, production queries, development rules, and environment setup remain with team-standards or the owning project.",
     "developerName": "Zhang Kai",
     "category": "Productivity",
     "capabilities": [
@@ -42,10 +27,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "\u6211\u662f\u65b0\u540c\u4e8b\uff0c\u600e\u4e48\u5f00\u59cb\uff1f",
-      "\u5b89\u88c5\u516c\u53f8\u56e2\u961f\u5de5\u5177\u3002",
-      "\u542f\u52a8 Yoooni \u9879\u76ee\u3002",
-      "\u68c0\u67e5 Yoooni DDL \u662f\u5426\u6f02\u79fb\u3002"
+      "\u4fee\u590d\u8fd9\u53f0\u7535\u8111\u8bbf\u95ee IT01 \u5171\u4eab\u7684\u95ee\u9898\u3002",
+      "\u751f\u6210\u672c\u5468 Hook \u547d\u4e2d\u548c\u7591\u95ee\u7ea0\u6b63\u62a5\u544a\u3002"
     ],
     "brandColor": "#0EA5E9"
   }

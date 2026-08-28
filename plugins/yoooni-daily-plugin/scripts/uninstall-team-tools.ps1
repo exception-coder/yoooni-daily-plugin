@@ -119,6 +119,6 @@ if ($removedMcp.Count) { Write-Host ("已移除 MCP : " + ($removedMcp -join ', 
 if (-not ($removedPlugins.Count -or $removedMcp.Count)) { Write-Host '没有可卸载项（可能本就没装）。' -ForegroundColor Green }
 Write-Host ''
 Write-Host '重装：scripts\bootstrap-install.ps1（全新机器，含本体 + 定时任务）' -ForegroundColor Cyan
-Write-Host '      或 skills\yoooni-install-team-tools\install-team-tools.ps1（已有本体时）' -ForegroundColor Cyan
+Write-Host '      或 scripts\install-team-tools.ps1（已有本体时）' -ForegroundColor Cyan
 Write-Host '插件卸载在重启 Claude Code 会话后完全生效。' -ForegroundColor Cyan
 Write-Host '==================================================' -ForegroundColor Cyan
