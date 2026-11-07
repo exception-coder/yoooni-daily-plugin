@@ -1,4 +1,4 @@
-> 1.1.0：业务知识改为项目内维护。安装/更新只配置 cross-project-topology 自带的独立 MCP；不再克隆、构建或注册 Domain Knowledge。历史知识迁移不由普通安装器自动执行。
+> 1.1.1：保留 Windows PowerShell 5.1 所需的 UTF-8 BOM。业务知识改为项目内维护。安装/更新只配置 cross-project-topology 自带的独立 MCP；不再克隆、构建或注册 Domain Knowledge。历史知识迁移不由普通安装器自动执行。
 
 # yoooni-daily-plugin
 

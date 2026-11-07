@@ -1,6 +1,6 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Yoooni daily assistant with 2 skills for IT01 SMB access recovery and team hook reporting.",
   "author": {
     "name": "Zhang Kai",
@@ -18,7 +18,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Yoooni Daily Plugin",
-    "shortDescription": "Yoooni \u65e5\u5e38\u8f85\u52a9\uff1aIT01 SMB \u8bbf\u95ee\u4e0e Hook \u56e2\u961f\u53cd\u9988\u3002",
+    "shortDescription": "Yoooni 日常辅助：IT01 SMB 访问与 Hook 团队反馈。",
     "longDescription": "Yoooni daily assistance with two narrowly scoped skills: IT01 SMB access recovery and team hook reporting. Project onboarding, production queries, development rules, and environment setup remain with team-standards or the owning project.",
     "developerName": "Zhang Kai",
     "category": "Productivity",
@@ -27,8 +27,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "\u4fee\u590d\u8fd9\u53f0\u7535\u8111\u8bbf\u95ee IT01 \u5171\u4eab\u7684\u95ee\u9898\u3002",
-      "\u751f\u6210\u672c\u5468 Hook \u547d\u4e2d\u548c\u7591\u95ee\u7ea0\u6b63\u62a5\u544a\u3002"
+      "修复这台电脑访问 IT01 共享的问题。",
+      "生成本周 Hook 命中和疑问纠正报告。"
     ],
     "brandColor": "#0EA5E9"
   }

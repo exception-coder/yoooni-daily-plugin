@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   用户触发后，一次刷新公司团队套件的两个部分：
     [MCP 仓] git pull cross-project-topology
