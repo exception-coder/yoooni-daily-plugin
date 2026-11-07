@@ -3,7 +3,7 @@
   用户触发后，一次刷新公司团队套件的两个部分：
     [MCP 仓] git pull cross-project-topology
              若 cross-project-topology 有更新 -> npm ci（有 lockfile）+ npm run build
-             幂等重注册 cross-topology 独立 MCP
+             刷新 cross-topology 独立 MCP；Codex 已移除或禁用的配置保持原状
     [插件]   claude plugin marketplace update 刷新源 ->
              claude plugin update <plugin>@<marketplace> 逐个更新
              (team-standards / project-coding-profiles / yoooni-daily-plugin)，
@@ -90,21 +90,26 @@ function Sync-CodexMcpConfig($codexRoot, $configPath, $servers) {
   $text = $existing
   $added = @()
   $updated = @()
+  $skipped = @()
   foreach ($name in $servers.Keys) {
     $block = New-CodexMcpBlock $name $servers[$name]
     $escaped = [regex]::Escape($name)
     $pattern = '(?ms)^\[mcp_servers\.(?:"' + $escaped + '"|' + $escaped + ')\]\s*\r?\n.*?(?=^\[(?!mcp_servers\.(?:"' + $escaped + '"|' + $escaped + ')\.)|\z)'
     if ($text -match $pattern) {
       $current = $Matches[0]
+      # 更新不能重新启用用户已停用的 MCP；首次注册由安装器处理。
+      if ($current -match '(?m)^\s*enabled\s*=\s*false\s*(?:#.*)?$') {
+        $skipped += $name
+        continue
+      }
       if ($current.Trim() -ne $block.Trim()) {
         $text = [regex]::Replace($text, $pattern, $block.TrimStart(), 1)
         $updated += $name
       }
     }
     else {
-      $sep = if ($text -and -not $text.EndsWith("`n")) { "`n" } else { '' }
-      $text += $sep + $block
-      $added += $name
+      # 未注册可能是主动卸载，普通更新不恢复该工具。
+      $skipped += $name
     }
   }
 
@@ -113,7 +118,7 @@ function Sync-CodexMcpConfig($codexRoot, $configPath, $servers) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     Write-CodexConfigUtf8 $configPath $text $existing
   }
-  return [pscustomobject]@{ Added = $added; Updated = $updated }
+  return [pscustomobject]@{ Added = $added; Updated = $updated; Skipped = $skipped }
 }
 
 function Sync-JsonMcpConfig($toolRoot, $configPath, $servers) {
@@ -401,6 +406,9 @@ if (Test-Path $entry) {
   }
   else {
     Log "  codex: MCP config already current"
+  }
+  if ($null -ne $codexResult -and $codexResult.Skipped.Count) {
+    Log ("  codex: keep removed or disabled MCPs: {0}" -f ($codexResult.Skipped -join ','))
   }
 
   $jsonMcp = [ordered]@{
