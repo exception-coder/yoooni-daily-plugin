@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # update-team-tools.sh —— macOS / Linux 版「自动刷新公司团队套件」，对照 update-team-tools.ps1。
-#   [MCP 仓] git pull project-domain-knowledge / cross-project-topology
-#            project-domain-knowledge 有更新 -> npm ci（有 lockfile）+ npm run build
-#            内容有更新则幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
+#   [MCP 仓] git pull cross-project-topology
+#            cross-project-topology 有更新 -> npm ci（有 lockfile）+ npm run build
+#            内容有更新则幂等重注册 cross-topology 独立 MCP
 #   [插件]   claude plugin marketplace update 刷源 -> claude plugin update <p>@<p> 逐个更新
 #            (team-standards / project-coding-profiles / yoooni-daily-plugin)，幂等
 # 由用户手动运行、显式注册的 launchd 计划任务或更新 skill 调用。
@@ -84,15 +84,14 @@ sync_codex_mcp_server() {
   log "  codex: MCP config synced -> $name"
 }
 sync_json_mcp_config() {
-  tool="$1"; root="$2"; cfg="$3"; entry="$4"; domain_kb="$5"; topo_kb="$6"
+  tool="$1"; root="$2"; cfg="$3"; entry="$4"; topo_kb="$5"
   [ -d "$root" ] || { log "  $tool: root not found, skip MCP config"; return 0; }
   has node || { log "  $tool: node not found, skip MCP config"; return 0; }
-  TOOL_NAME="$tool" MCP_JSON_CONFIG="$cfg" MCP_ENTRY="$entry" DOMAIN_KB="$domain_kb" TOPO_KB="$topo_kb" node <<'NODE'
+  TOOL_NAME="$tool" MCP_JSON_CONFIG="$cfg" MCP_ENTRY="$entry" TOPO_KB="$topo_kb" node <<'NODE'
 const fs = require('fs');
 const path = require('path');
 const cfg = process.env.MCP_JSON_CONFIG;
 const entry = process.env.MCP_ENTRY.replace(/\\/g, '/');
-const domainKb = process.env.DOMAIN_KB.replace(/\\/g, '/');
 const topoKb = (process.env.TOPO_KB || '').replace(/\\/g, '/');
 let root = {};
 try {
@@ -104,11 +103,6 @@ if (!root || typeof root !== 'object' || Array.isArray(root)) root = {};
 if (!root.mcpServers || typeof root.mcpServers !== 'object' || Array.isArray(root.mcpServers)) {
   root.mcpServers = {};
 }
-root.mcpServers['domain-knowledge'] = {
-  command: 'node',
-  args: [entry],
-  env: { DOMAIN_KB_DIR: domainKb },
-};
 if (topoKb && fs.existsSync(topoKb)) {
   root.mcpServers['cross-topology'] = {
     command: 'node',
@@ -232,27 +226,25 @@ sync_kiro_steering() {
 if [ -z "$WORKSPACE_DIR" ] && [ -n "${YOOONI_WORKSPACE_DIR:-}" ]; then WORKSPACE_DIR="$YOOONI_WORKSPACE_DIR"; fi
 if [ -z "$WORKSPACE_DIR" ] && [ -f "$CFG" ]; then WORKSPACE_DIR="$(tr -d '\r\357\273\277' < "$CFG" | head -n1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"; fi
 if [ -z "$WORKSPACE_DIR" ] && has claude; then
-  _info="$( { claude mcp get domain-knowledge 2>/dev/null; claude mcp list 2>/dev/null; } )"
-  _m="$(printf '%s\n' "$_info" | grep -oE '(/[^[:space:]]+)/project-domain-knowledge/dist/server\.js' | head -n1)"
-  if [ -n "$_m" ]; then WORKSPACE_DIR="${_m%/project-domain-knowledge/dist/server.js}"; fi
+  _info="$( { claude mcp get cross-topology 2>/dev/null; claude mcp list 2>/dev/null; } )"
+  _m="$(printf '%s\n' "$_info" | grep -oE '(/[^[:space:]]+)/cross-project-topology/dist/server\.js' | head -n1)"
+  if [ -n "$_m" ]; then WORKSPACE_DIR="${_m%/cross-project-topology/dist/server.js}"; fi
 fi
 [ -z "$WORKSPACE_DIR" ] && WORKSPACE_DIR="$HOME/myWork"
 printf '%s' "$WORKSPACE_DIR" > "$CFG"   # 记住，下次直接用
 
 log "=== update start (ws=$WORKSPACE_DIR, scope=$MCP_SCOPE) ==="
-MCP_DIR="$WORKSPACE_DIR/project-domain-knowledge"
+MCP_DIR="$WORKSPACE_DIR/cross-project-topology"
 TOPO_DIR="$WORKSPACE_DIR/cross-project-topology"
-PDK_CHANGED=0
-ANY_CHANGED=0
+TOPOLOGY_CHANGED=0
 
-for d in "$MCP_DIR" "$TOPO_DIR"; do
+for d in "$TOPO_DIR"; do
   if [ -d "$d/.git" ]; then
     before="$(git -C "$d" rev-parse HEAD 2>/dev/null)"
     git -C "$d" pull --ff-only 2>&1 | while IFS= read -r line; do log "  git $line"; done
     after="$(git -C "$d" rev-parse HEAD 2>/dev/null)"
     if [ "$before" != "$after" ]; then
-      ANY_CHANGED=1
-      [ "$d" = "$MCP_DIR" ] && PDK_CHANGED=1
+      [ "$d" = "$MCP_DIR" ] && TOPOLOGY_CHANGED=1
     fi
   else
     log "  skip (not cloned): $d"
@@ -268,7 +260,7 @@ for repo_name in team-standards project-coding-profiles yoooni-daily-plugin; do
   fi
 done
 
-if [ "$PDK_CHANGED" = "1" ] && has npm; then
+if { [ "$TOPOLOGY_CHANGED" = "1" ] || [ ! -f "$MCP_DIR/dist/server.js" ]; } && has npm; then
   if [ -f "$MCP_DIR/package-lock.json" ]; then
     log "  npm ci/build (engine updated)"
     ( cd "$MCP_DIR" && npm ci --no-audit --no-fund 2>&1 | while IFS= read -r l; do log "  npm $l"; done && npm run build 2>&1 | while IFS= read -r l; do log "  build $l"; done )
@@ -279,12 +271,11 @@ if [ "$PDK_CHANGED" = "1" ] && has npm; then
 fi
 
 ENTRY="$MCP_DIR/dist/server.js"
-# 仅当仓库内容有更新时才重注册(触发 MCP 下次会话重启、加载新知识/引擎)；无变化不动
-if [ "$ANY_CHANGED" = "1" ] && has claude && [ -f "$ENTRY" ]; then
-  DOMAIN_KB="$MCP_DIR/knowledge"
+# 内容更新或仍使用旧入口时切换到独立服务。
+CLAUDE_TOPOLOGY_CURRENT=0
+if has claude && claude mcp get cross-topology 2>/dev/null | grep -Fq "$ENTRY"; then CLAUDE_TOPOLOGY_CURRENT=1; fi
+if { [ "$TOPOLOGY_CHANGED" = "1" ] || [ "$CLAUDE_TOPOLOGY_CURRENT" = "0" ]; } && has claude && [ -f "$ENTRY" ]; then
   TOPO_KB="$TOPO_DIR/knowledge"
-  claude mcp remove domain-knowledge -s "$MCP_SCOPE" >/dev/null 2>&1
-  claude mcp add domain-knowledge -s "$MCP_SCOPE" -e "DOMAIN_KB_DIR=$DOMAIN_KB" -- node "$ENTRY" 2>&1 | while IFS= read -r l; do log "  mcp $l"; done
   if [ -d "$TOPO_KB" ]; then
     claude mcp remove cross-topology -s "$MCP_SCOPE" >/dev/null 2>&1
     claude mcp add cross-topology -s "$MCP_SCOPE" -e "DOMAIN_KB_DIR=$TOPO_KB" -- node "$ENTRY" 2>&1 | while IFS= read -r l; do log "  mcp $l"; done
@@ -292,14 +283,12 @@ if [ "$ANY_CHANGED" = "1" ] && has claude && [ -f "$ENTRY" ]; then
 fi
 
 if [ -f "$ENTRY" ]; then
-  DOMAIN_KB="$MCP_DIR/knowledge"
   TOPO_KB="$TOPO_DIR/knowledge"
-  sync_codex_mcp_server "domain-knowledge" "$ENTRY" "$DOMAIN_KB"
   if [ -d "$TOPO_KB" ]; then
     sync_codex_mcp_server "cross-topology" "$ENTRY" "$TOPO_KB"
   fi
-  sync_json_mcp_config "cursor" "$HOME/.cursor" "$HOME/.cursor/mcp.json" "$ENTRY" "$DOMAIN_KB" "$TOPO_KB"
-  sync_json_mcp_config "kiro" "$HOME/.kiro" "$HOME/.kiro/settings/mcp.json" "$ENTRY" "$DOMAIN_KB" "$TOPO_KB"
+  sync_json_mcp_config "cursor" "$HOME/.cursor" "$HOME/.cursor/mcp.json" "$ENTRY" "$TOPO_KB"
+  sync_json_mcp_config "kiro" "$HOME/.kiro" "$HOME/.kiro/settings/mcp.json" "$ENTRY" "$TOPO_KB"
 fi
 
 sync_codex_plugins
@@ -344,4 +333,4 @@ if [ -f "$REG" ]; then
   bash "$REG" --only-if-exists >/dev/null 2>&1 && log "  task: 自愈校准 launchd（仅当已存在）" || true
 fi
 
-log "=== update done (pdkChanged=$PDK_CHANGED, pluginNotice=${PLUGIN_NOTICE:-none}) ==="
+log "=== update done (topologyChanged=$TOPOLOGY_CHANGED, pluginNotice=${PLUGIN_NOTICE:-none}) ==="

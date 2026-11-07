@@ -1,3 +1,5 @@
+> 1.1.0：业务知识改为项目内维护。安装/更新只配置 cross-project-topology 自带的独立 MCP；不再克隆、构建或注册 Domain Knowledge。历史知识迁移不由普通安装器自动执行。
+
 # yoooni-daily-plugin
 
 Yoooni 日常辅助插件。它不是主路由，也不承载项目开发、通用 onboarding、环境搭建、生产系统查询或团队工具安装流程。

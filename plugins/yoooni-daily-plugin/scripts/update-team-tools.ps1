@@ -1,9 +1,9 @@
-﻿<#
+<#
 .SYNOPSIS
   用户触发后，一次刷新公司团队套件的两个部分：
-    [MCP 仓] git pull project-domain-knowledge / cross-project-topology
-             若 project-domain-knowledge 有更新 -> npm ci（有 lockfile）+ npm run build
-             幂等重注册 domain-knowledge / cross-topology 两个 MCP 实例
+    [MCP 仓] git pull cross-project-topology
+             若 cross-project-topology 有更新 -> npm ci（有 lockfile）+ npm run build
+             幂等重注册 cross-topology 独立 MCP
     [插件]   claude plugin marketplace update 刷新源 ->
              claude plugin update <plugin>@<marketplace> 逐个更新
              (team-standards / project-coding-profiles / yoooni-daily-plugin)，
@@ -36,7 +36,7 @@ $updateMutex = Enter-YoooniUpdateMutex
 if ($null -eq $updateMutex) { Log 'skip: another team-tools update is already running'; return }
 try {
 function Has($c){ [bool](Get-Command $c -ErrorAction SilentlyContinue) }
-function HasPdk($w){ return ($w -and (Test-Path (Join-Path $w 'project-domain-knowledge\.git'))) }
+function HasTopology($w){ return ($w -and (Test-Path (Join-Path $w 'cross-project-topology\.git'))) }
 function Escape-TomlString($s){ return (($s -replace '\\','/') -replace '"','\"') }
 
 function Read-CodexConfigUtf8($configPath) {
@@ -314,19 +314,19 @@ if ($WorkspaceDir) { $cands += $WorkspaceDir }
 if ($env:YOOONI_WORKSPACE_DIR) { $cands += $env:YOOONI_WORKSPACE_DIR }
 if (Test-Path $cfg) { $cands += (((Get-Content $cfg -Raw) -replace "^\xEF\xBB\xBF","") -replace "﻿","").Trim() }
 if (Has claude) {
-  $info = @((claude mcp get domain-knowledge 2>$null); (claude mcp list 2>$null)) -join "`n"
-  $m = [regex]::Match($info, '([A-Za-z]:[\/].*?)[\/]project-domain-knowledge[\/]dist[\/]server\.js')
+  $info = @((claude mcp get cross-topology 2>$null); (claude mcp list 2>$null)) -join "`n"
+  $m = [regex]::Match($info, '([A-Za-z]:[\/].*?)[\/]cross-project-topology[\/]dist[\/]server\.js')
   if ($m.Success) { $cands += $m.Groups[1].Value }
 }
 $cands += (Join-Path $env:USERPROFILE 'myWork')
 foreach ($drv in @('C:','D:','E:','F:')) { $cands += ("{0}\Users\{1}\myWork" -f $drv, $env:USERNAME) }
 $WorkspaceDir = $null
-foreach ($c in $cands) { if (HasPdk $c) { $WorkspaceDir = $c; break } }
+foreach ($c in $cands) { if (HasTopology $c) { $WorkspaceDir = $c; break } }
 if (-not $WorkspaceDir) { $WorkspaceDir = (Join-Path $env:USERPROFILE 'myWork') }
 [IO.File]::WriteAllText($cfg, $WorkspaceDir, $utf8)   # 记住(无 BOM)，下次直接用
 
 Log "=== update start (ws=$WorkspaceDir, scope=$McpScope) ==="
-$mcpDir  = Join-Path $WorkspaceDir 'project-domain-knowledge'
+$mcpDir  = Join-Path $WorkspaceDir 'cross-project-topology'
 $topoDir = Join-Path $WorkspaceDir 'cross-project-topology'
 $pluginUrls = @{
   'team-standards' = 'https://gitee.com/wyoooni/team-standards.git'
@@ -337,16 +337,14 @@ $pluginRepos = @{}
 foreach ($pluginName in $pluginUrls.Keys) {
   $pluginRepos[$pluginName] = Find-RepoDir $pluginName $WorkspaceDir
 }
-$pdkChanged = $false
-$anyChanged = $false
+$topologyChanged = $false
 
-foreach ($d in @($mcpDir, $topoDir)) {
+foreach ($d in @($topoDir)) {
   if (Test-Path (Join-Path $d '.git')) {
     $before = (git -C $d rev-parse HEAD 2>$null)
     git -C $d pull --ff-only 2>&1 | ForEach-Object { Log ("  git " + $_) }
     $after  = (git -C $d rev-parse HEAD 2>$null)
-    if ($before -ne $after) { $anyChanged = $true }
-    if (($d -eq $mcpDir) -and ($before -ne $after)) { $pdkChanged = $true }
+    if (($d -eq $mcpDir) -and ($before -ne $after)) { $topologyChanged = $true }
   } else { Log ("  skip (not cloned): " + $d) }
 }
 
@@ -359,7 +357,7 @@ foreach ($pluginName in $pluginUrls.Keys) {
   }
 }
 
-if ($pdkChanged -and (Has npm)) {
+if (($topologyChanged -or -not (Test-Path (Join-Path $mcpDir 'dist/server.js'))) -and (Has npm)) {
   Push-Location $mcpDir
   try {
     $installArgs = if (Test-Path (Join-Path $mcpDir 'package-lock.json')) { @('ci', '--no-audit', '--no-fund') } else { @('install', '--no-audit', '--no-fund') }
@@ -373,13 +371,11 @@ if ($pdkChanged -and (Has npm)) {
 }
 
 $entry = Join-Path $mcpDir 'dist\server.js'
-$domainKb = Join-Path $mcpDir 'knowledge'
 $topoKb   = Join-Path $topoDir 'knowledge'
-# 仅当仓库内容有更新时才重注册(触发 MCP 下次会话重启、加载新知识/引擎)；无变化不动，省churn
-if ($anyChanged -and (Has claude) -and (Test-Path $entry)) {
-  claude mcp remove domain-knowledge -s $McpScope 2>$null | Out-Null
+# 内容更新或仍使用旧入口时，切换到独立 cross-topology；当前配置不重复注册。
+$claudeTopologyCurrent = if (Has claude) { (claude mcp get cross-topology 2>$null | Out-String).Replace('\', '/').Contains($entry.Replace('\', '/')) } else { $false }
+if (($topologyChanged -or -not $claudeTopologyCurrent) -and (Has claude) -and (Test-Path $entry)) {
   # '--' 必须带引号：裸 -- 会被 PowerShell 吞掉，导致变参 -e 吞掉 node+路径而报 missing commandOrUrl
-  claude mcp add domain-knowledge -s $McpScope -e "DOMAIN_KB_DIR=$domainKb" '--' node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
   if (Test-Path $topoKb) {
     claude mcp remove cross-topology -s $McpScope 2>$null | Out-Null
     claude mcp add cross-topology -s $McpScope -e "DOMAIN_KB_DIR=$topoKb" '--' node "$entry" 2>&1 | ForEach-Object { Log ("  mcp " + $_) }
@@ -390,9 +386,7 @@ if (Test-Path $entry) {
   $codexRoot = Join-Path $env:USERPROFILE '.codex'
   $codexCfg = Join-Path $codexRoot 'config.toml'
   $entryFwd = $entry -replace '\\','/'
-  $domainKbFwd = $domainKb -replace '\\','/'
   $codexMcp = [ordered]@{
-    'domain-knowledge' = [pscustomobject]@{ command = 'node'; args = @($entryFwd); env = [pscustomobject]@{ DOMAIN_KB_DIR = $domainKbFwd } }
   }
   if (Test-Path $topoKb) {
     $topoKbFwd = $topoKb -replace '\\','/'
@@ -410,14 +404,14 @@ if (Test-Path $entry) {
   }
 
   $jsonMcp = [ordered]@{
-    'domain-knowledge' = [pscustomobject]@{ command = 'node'; args = @($entryFwd); env = [pscustomobject]@{ DOMAIN_KB_DIR = $domainKbFwd } }
   }
   if (Test-Path $topoKb) {
     $jsonMcp['cross-topology'] = [pscustomobject]@{ command = 'node'; args = @($entryFwd); env = [pscustomobject]@{ DOMAIN_KB_DIR = $topoKbFwd } }
   }
   $toolTargets = @(
     @{ Name = 'cursor'; Root = (Join-Path $env:USERPROFILE '.cursor'); Config = (Join-Path $env:USERPROFILE '.cursor\mcp.json') },
-    @{ Name = 'kiro'; Root = (Join-Path $env:USERPROFILE '.kiro'); Config = (Join-Path $env:USERPROFILE '.kiro\settings\mcp.json') }
+    @{ Name = 'kiro'; Root = (Join-Path $env:USERPROFILE '.kiro'); Config = (Join-Path $env:USERPROFILE '.kiro\settings\mcp.json') },
+    @{ Name = 'antigravity'; Root = (Join-Path $env:USERPROFILE '.gemini'); Config = (Join-Path $env:USERPROFILE '.gemini\config\mcp_config.json') }
   )
   foreach ($target in $toolTargets) {
     $syncResult = Sync-JsonMcpConfig $target.Root $target.Config $jsonMcp
@@ -461,6 +455,35 @@ if ($null -eq $kiroSteering) {
 }
 else {
   Log ("  kiro: steering synced -> " + $kiroSteering)
+}
+
+function Sync-AntigravityPlugins($plugins) {
+  if (-not (Has agy)) { return $null }
+  $installed = @()
+  foreach ($p in $plugins) {
+    $claudeManifest = Join-Path $p.PluginDir '.claude-plugin\plugin.json'
+    $agyManifest = Join-Path $p.PluginDir 'plugin.json'
+    if (Test-Path $claudeManifest) {
+      try {
+        $cm = Get-Content $claudeManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+        $am = [ordered]@{ name = $cm.name; version = $cm.version; description = $cm.description }
+        [IO.File]::WriteAllText($agyManifest, ($am | ConvertTo-Json -Depth 4), $utf8)
+      } catch {}
+    }
+    if (Test-Path $agyManifest) {
+      & agy plugin install $p.PluginDir 2>&1 | Out-Null
+      $installed += $p.Name
+    }
+  }
+  return $installed
+}
+
+$antigravityResult = Sync-AntigravityPlugins $codexPluginDefs
+if ($null -eq $antigravityResult) {
+  Log "  antigravity: agy CLI 不存在，跳过 plugin 同步"
+}
+else {
+  Log ("  antigravity: plugins installed={0}" -f ($antigravityResult -join ','))
 }
 
 # --- 插件：claude plugin 现为完整 CLI，可全自动更新(无需本地克隆源码，直接走已注册 marketplace) ---
@@ -567,7 +590,7 @@ if (Test-Path $reg) {
   catch { Log ("  task self-heal skipped: " + $_.Exception.Message) }
 }
 
-Log ("=== update done (pdkChanged={0}, pluginsUpdated={1}) ===" -f $pdkChanged, $pluginUpdated.Count)
+Log ("=== update done (topologyChanged={0}, pluginsUpdated={1}) ===" -f $topologyChanged, $pluginUpdated.Count)
 }
 finally {
   Exit-YoooniUpdateMutex $updateMutex

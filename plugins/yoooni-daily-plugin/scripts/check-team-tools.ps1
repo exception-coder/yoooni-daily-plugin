@@ -29,7 +29,7 @@ $ExpectedPlugins = @(
     'project-coding-profiles@project-coding-profiles'
 )
 $ExpectedPluginNames = @('team-standards', 'project-coding-profiles', 'yoooni-daily-plugin')
-$ExpectedMcpServers = @('domain-knowledge', 'cross-topology')
+$ExpectedMcpServers = @('cross-topology')
 $AutoUpdateTaskName = 'YoooniTeamToolsAutoUpdate'
 $InstalledPluginsFile = Join-Path $env:USERPROFILE '.claude\plugins\installed_plugins.json'
 $CodexConfigFile = Join-Path $env:USERPROFILE '.codex\config.toml'
@@ -217,7 +217,6 @@ function Test-WorkspaceRepos($ResolvedWorkspaceDir) {
     $repoNames = @(
         'yoooni-daily-plugin',
         'project-coding-profiles',
-        'project-domain-knowledge',
         'cross-project-topology'
     )
 
@@ -317,14 +316,13 @@ function Get-McpCliMap {
 }
 
 function Get-CodexExpectedMcpSpecs($ResolvedWorkspaceDir) {
-    $mcpDir = Join-Path $ResolvedWorkspaceDir 'project-domain-knowledge'
+    $mcpDir = Join-Path $ResolvedWorkspaceDir 'cross-project-topology'
     $topoDir = Join-Path $ResolvedWorkspaceDir 'cross-project-topology'
     $entry = (Join-Path $mcpDir 'dist\server.js') -replace '\\', '/'
     $domainKb = (Join-Path $mcpDir 'knowledge') -replace '\\', '/'
     $topoKb = (Join-Path $topoDir 'knowledge') -replace '\\', '/'
 
     $specs = [ordered]@{
-        'domain-knowledge' = [pscustomobject]@{ Entry = $entry; Kb = $domainKb }
     }
     if (Test-Path -LiteralPath ($topoKb -replace '/', '\')) {
         $specs['cross-topology'] = [pscustomobject]@{ Entry = $entry; Kb = $topoKb }

@@ -7,7 +7,7 @@
     本脚本是【零依赖引导】，会连「本体插件 yoooni-daily-plugin」自身一并克隆 + 安装。
     中间的「关联插件 + MCP」直接委托 install-team-tools.ps1（幂等、已装跳过），不重复实现。
 
-  流程：1) 克隆+装本体 → 2) 委托装 team-standards/project-coding-profiles + MCP(domain-knowledge/cross-topology)
+  流程：1) 克隆+装本体 → 2) 委托装 team-standards/project-coding-profiles + 独立 cross-topology MCP
         → 3) 按显式参数选择是否注册定时更新任务。全程幂等，已就绪的跳过。
 
 .PARAMETER WorkspaceDir 仓库克隆根目录；不传则自动定位（已克隆目录 > 配置 > 默认 %USERPROFILE%\myWork）。

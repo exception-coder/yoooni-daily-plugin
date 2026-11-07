@@ -59,7 +59,7 @@ node prompt-signal-report.mjs --json                 # 给程序用
 2. 每簇产出一行：
    | 业务领域/主题 | 类型(疑问/纠正) | 命中频次·涉及人 | 推断的缺口 | 建议补到哪 |
    - **建议补到哪**按缺口性质分流：
-     - 业务字段/口径/流程不清 → **domain-knowledge 知识库** 或 **glossary 术语表**（`_candidates.md`）
+     - 业务字段/口径/流程不清 → **所属项目业务文档 / docs/domain** 的现有术语或规则正文；候选保留待确认状态
      - 反复纠正同类编码写法 → **team-standards 通用规范/skill**（够客观可加 hook）
      - 项目专属约定 → **project-coding-profiles** 对应项目画像
      - AI 老理解错某类意图 → 优化相关 **skill 的 description/提示词**

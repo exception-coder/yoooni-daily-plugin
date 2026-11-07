@@ -1,6 +1,6 @@
 {
   "name": "yoooni-daily-plugin",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Yoooni daily assistant with 2 skills for IT01 SMB access recovery and team hook reporting.",
   "author": {
     "name": "Zhang Kai",

@@ -27,7 +27,7 @@ fi
 has node && has npm && HAS_NODE=1 || HAS_NODE=0
 has claude && HAS_CLAUDE=1 || HAS_CLAUDE=0
 
-has_pdk() { [ -n "${1:-}" ] && [ -d "$1/project-domain-knowledge/.git" ]; }
+has_topology() { [ -n "${1:-}" ] && [ -d "$1/cross-project-topology/.git" ]; }
 toml_path() { printf '%s' "$1" | sed 's#\\#/#g; s#"#\\"#g'; }
 
 find_repo_dir() {
@@ -79,15 +79,14 @@ add_codex_mcp_server() {
 }
 
 sync_json_mcp_config() {
-  tool="$1"; root="$2"; cfg="$3"; entry="$4"; domain_kb="$5"; topo_kb="$6"
+  tool="$1"; root="$2"; cfg="$3"; entry="$4"; topo_kb="$5"
   [ -d "$root" ] || { echo "  - $tool not installed, skip MCP config"; return 0; }
   has node || { echo "  - $tool: node is not available, skip MCP config"; return 0; }
-  MCP_JSON_CONFIG="$cfg" MCP_ENTRY="$entry" DOMAIN_KB="$domain_kb" TOPO_KB="$topo_kb" node <<'NODE'
+  MCP_JSON_CONFIG="$cfg" MCP_ENTRY="$entry" TOPO_KB="$topo_kb" node <<'NODE'
 const fs = require('fs');
 const path = require('path');
 const cfg = process.env.MCP_JSON_CONFIG;
 const entry = process.env.MCP_ENTRY.replace(/\\/g, '/');
-const domainKb = process.env.DOMAIN_KB.replace(/\\/g, '/');
 const topoKb = (process.env.TOPO_KB || '').replace(/\\/g, '/');
 let root = {};
 try {
@@ -97,7 +96,6 @@ try {
 }
 if (!root || typeof root !== 'object' || Array.isArray(root)) root = {};
 if (!root.mcpServers || typeof root.mcpServers !== 'object' || Array.isArray(root.mcpServers)) root.mcpServers = {};
-root.mcpServers['domain-knowledge'] = { command: 'node', args: [entry], env: { DOMAIN_KB_DIR: domainKb } };
 if (topoKb && fs.existsSync(topoKb)) {
   root.mcpServers['cross-topology'] = { command: 'node', args: [entry], env: { DOMAIN_KB_DIR: topoKb } };
 }
@@ -217,7 +215,7 @@ sync_kiro_steering() {
 resolved=""
 for c in "$WORKSPACE_DIR" "${YOOONI_WORKSPACE_DIR:-}" "$([ -f "$CFG" ] && tr -d '\r\357\273\277' < "$CFG" | head -n1)" "$HOME/myWork"; do
   [ -n "$c" ] || continue
-  if has_pdk "$c"; then resolved="$c"; break; fi
+  if has_topology "$c"; then resolved="$c"; break; fi
 done
 if [ -z "$resolved" ]; then
   if [ -n "$WORKSPACE_DIR" ]; then resolved="$WORKSPACE_DIR"
@@ -240,7 +238,7 @@ echo "Scope    : $SCOPE"
 new_repos=""; new_mcp=""; new_plugins=""; new_tool_plugins=""
 
 echo ""; echo "[1/3] Clone missing repos..."
-for r in team-standards project-coding-profiles project-domain-knowledge cross-project-topology; do
+for r in team-standards project-coding-profiles cross-project-topology; do
   dest="$WORKSPACE_DIR/$r"
   if [ -d "$dest/.git" ]; then
     echo "  = exists: $r"
@@ -251,20 +249,17 @@ for r in team-standards project-coding-profiles project-domain-knowledge cross-p
 done
 
 echo ""; echo "[2/3] Register Claude MCP servers..."
-MCP_DIR="$WORKSPACE_DIR/project-domain-knowledge"
+MCP_DIR="$WORKSPACE_DIR/cross-project-topology"
 ENTRY="$MCP_DIR/dist/server.js"
-DOMAIN_KB="$MCP_DIR/knowledge"
 TOPO_KB="$WORKSPACE_DIR/cross-project-topology/knowledge"
 mcp_registered() { [ "$HAS_CLAUDE" = "1" ] && claude mcp list 2>/dev/null | grep -qE "^[[:space:]]*$1\b"; }
+if [ "$HAS_NODE" = "1" ] && [ ! -f "$ENTRY" ]; then
+  ( cd "$MCP_DIR" && npm ci --no-audit --no-fund && npm run build ) || exit 1
+fi
 if [ "$HAS_CLAUDE" = "1" ]; then
-  need_domain=1; mcp_registered domain-knowledge && need_domain=0
   need_topo=0; [ -d "$TOPO_KB" ] && ! mcp_registered cross-topology && need_topo=1
-  if { [ "$need_domain" = "1" ] || [ "$need_topo" = "1" ]; } && [ "$HAS_NODE" = "1" ]; then
-    [ -f "$ENTRY" ] || ( cd "$MCP_DIR" && npm install && npm run build )
+  if [ "$need_topo" = "1" ] && [ "$HAS_NODE" = "1" ]; then
     if [ -f "$ENTRY" ]; then
-      if [ "$need_domain" = "1" ]; then
-        claude mcp add domain-knowledge -s "$SCOPE" -e "DOMAIN_KB_DIR=$DOMAIN_KB" -- node "$ENTRY" && new_mcp="$new_mcp domain-knowledge"
-      fi
       if [ "$need_topo" = "1" ]; then
         claude mcp add cross-topology -s "$SCOPE" -e "DOMAIN_KB_DIR=$TOPO_KB" -- node "$ENTRY" && new_mcp="$new_mcp cross-topology"
       fi
@@ -278,10 +273,9 @@ fi
 
 echo ""; echo "[2.5] Register MCP for Codex / Cursor / Kiro..."
 if [ -f "$ENTRY" ]; then
-  add_codex_mcp_server "domain-knowledge" "$ENTRY" "$DOMAIN_KB"
   [ -d "$TOPO_KB" ] && add_codex_mcp_server "cross-topology" "$ENTRY" "$TOPO_KB"
-  sync_json_mcp_config "Cursor" "$HOME/.cursor" "$HOME/.cursor/mcp.json" "$ENTRY" "$DOMAIN_KB" "$TOPO_KB"
-  sync_json_mcp_config "Kiro" "$HOME/.kiro" "$HOME/.kiro/settings/mcp.json" "$ENTRY" "$DOMAIN_KB" "$TOPO_KB"
+  sync_json_mcp_config "Cursor" "$HOME/.cursor" "$HOME/.cursor/mcp.json" "$ENTRY" "$TOPO_KB"
+  sync_json_mcp_config "Kiro" "$HOME/.kiro" "$HOME/.kiro/settings/mcp.json" "$ENTRY" "$TOPO_KB"
 else
   echo "  - MCP entry not found, skip Codex/Cursor/Kiro MCP config"
 fi
